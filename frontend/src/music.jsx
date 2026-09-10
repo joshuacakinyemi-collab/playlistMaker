@@ -2,6 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import Visualizer from './components/theme/Visualizer';
 import { useTheme } from './ThemeContext';
 
+const PANEL_TABS = [
+  { key: 'tracks', label: 'Tracks' },
+  { key: 'playlists', label: 'Playlists' },
+];
+
 function loadYoutubeAPI() {
   return new Promise((resolve) => {
     if (window.YT && window.YT.Player) return resolve();
@@ -12,12 +17,47 @@ function loadYoutubeAPI() {
   });
 }
 
-function MusicPlayer({ songs }) {
+// Scrolls its text sideways only when it doesn't fit its box, like a
+// hardware mp3 player's title marquee.
+function Marquee({ text, className = '' }) {
+  const wrapRef = useRef(null);
+  const trackRef = useRef(null);
+  const [distance, setDistance] = useState(0);
+
+  useEffect(() => {
+    const measure = () => {
+      const wrap = wrapRef.current;
+      const track = trackRef.current;
+      if (!wrap || !track) return;
+      const overflow = track.scrollWidth - wrap.clientWidth;
+      setDistance(overflow > 4 ? overflow : 0);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [text]);
+
+  return (
+    <div className={`marquee ${className}`} ref={wrapRef}>
+      <div
+        className={`marquee-track${distance ? ' scrolling' : ''}`}
+        ref={trackRef}
+        style={distance ? { '--marquee-distance': `${distance}px` } : undefined}
+      >
+        {text}
+      </div>
+    </div>
+  );
+}
+
+function MusicPlayer({ songs, playlists = [], currentPlaylistId, onSwitchPlaylist }) {
   const { accent } = useTheme();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   const [loop, setLoop] = useState(false);
+  const [showPlaylist, setShowPlaylist] = useState(false);
+  const [panelTab, setPanelTab] = useState('tracks');
   const [youtubeData, setYoutubeData] = useState({});
   const [duration, setDuration] = useState('0:00');
   const [currentTime, setCurrentTime] = useState('0:00');
@@ -29,6 +69,27 @@ function MusicPlayer({ songs }) {
   const playerRef = useRef(null);
   const intervalRef = useRef(null);
   const containerRef = useRef(null);
+  // Guards against constructing two YT.Player instances on the same
+  // container when initPlayer is invoked twice before the first finishes
+  // its async setup (e.g. React StrictMode's dev-only double-invoke, or a
+  // fast unmount/remount when switching playlists).
+  const creatingPlayerRef = useRef(false);
+
+  // Shuffle "bag": a shuffled order of every song index, walked one at a
+  // time so every song is played once before any song repeats.
+  const shuffleOrderRef = useRef([]);
+  const shufflePosRef = useRef(0);
+
+  const buildShuffleOrder = (startIndex) => {
+    const rest = songs
+      .map((_, i) => i)
+      .filter((i) => i !== startIndex);
+    for (let i = rest.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [rest[i], rest[j]] = [rest[j], rest[i]];
+    }
+    return startIndex === undefined ? rest : [startIndex, ...rest];
+  };
 
   const goToIndex = (i) => {
     currentIndexRef.current = i;
@@ -39,6 +100,10 @@ function MusicPlayer({ songs }) {
     const next = !shuffleRef.current;
     shuffleRef.current = next;
     setShuffle(next);
+    if (next) {
+      shuffleOrderRef.current = buildShuffleOrder(currentIndexRef.current);
+      shufflePosRef.current = 0;
+    }
   };
 
   const toggleLoop = () => {
@@ -48,9 +113,15 @@ function MusicPlayer({ songs }) {
   };
 
   const currentSong = songs[currentIndex];
-  const nextIndex = shuffle
-    ? Math.floor(Math.random() * songs.length)
-    : (currentIndex + 1) % songs.length;
+  let nextIndex;
+  if (shuffle && shuffleOrderRef.current.length === songs.length) {
+    const peekPos = shufflePosRef.current + 1;
+    nextIndex = peekPos < shuffleOrderRef.current.length
+      ? shuffleOrderRef.current[peekPos]
+      : shuffleOrderRef.current[0];
+  } else {
+    nextIndex = (currentIndex + 1) % songs.length;
+  }
   const nextSong = songs[nextIndex];
 
   const fetchYoutubeData = async (song) => {
@@ -87,24 +158,49 @@ function MusicPlayer({ songs }) {
   const changeSong = (next = true) => {
     const idx = currentIndexRef.current;
     let newIndex;
-    if (shuffleRef.current) newIndex = Math.floor(Math.random() * songs.length);
-    else if (next) newIndex = (idx + 1) % songs.length;
+    if (shuffleRef.current) {
+      if (shuffleOrderRef.current.length !== songs.length) {
+        shuffleOrderRef.current = buildShuffleOrder(idx);
+        shufflePosRef.current = 0;
+      }
+      if (next) {
+        shufflePosRef.current += 1;
+        if (shufflePosRef.current >= shuffleOrderRef.current.length) {
+          // Played through every song — reshuffle and start the bag over.
+          shuffleOrderRef.current = buildShuffleOrder();
+          shufflePosRef.current = 0;
+        }
+      } else {
+        shufflePosRef.current -= 1;
+        if (shufflePosRef.current < 0) {
+          shufflePosRef.current = shuffleOrderRef.current.length - 1;
+        }
+      }
+      newIndex = shuffleOrderRef.current[shufflePosRef.current];
+    } else if (next) newIndex = (idx + 1) % songs.length;
     else newIndex = (idx - 1 + songs.length) % songs.length;
     goToIndex(newIndex);
     initPlayer(songs[newIndex], true);
   };
 
-  const initPlayer = async (song, autoStart = false) => {
+  // isStale lets a call abandon itself once its owning effect has been
+  // cleaned up (React StrictMode's dev-only double-invoke, or a fast
+  // unmount while a fetch/await is still in flight) instead of touching
+  // refs — or restarting the time-tracking interval — for a component
+  // that's already gone.
+  const initPlayer = async (song, autoStart = false, isStale = () => false) => {
     const data = await fetchYoutubeData(song);
-    if (!data) return;
+    if (!data || isStale()) return;
 
     await loadYoutubeAPI();
+    if (isStale()) return;
 
     if (playerRef.current?.loadVideoById) {
       playerRef.current.loadVideoById(data.youtube_id);
       if (autoStart) playerRef.current.playVideo?.();
       else playerRef.current.pauseVideo?.();
-    } else {
+    } else if (!creatingPlayerRef.current && containerRef.current) {
+      creatingPlayerRef.current = true;
       playerRef.current = new window.YT.Player(containerRef.current, {
         height: '0',
         width: '0',
@@ -112,6 +208,8 @@ function MusicPlayer({ songs }) {
         playerVars: { autoplay: 0 },
         events: {
           onReady: (e) => {
+            creatingPlayerRef.current = false;
+            if (isStale()) return;
             if (autoStart) e.target.playVideo();
             else e.target.pauseVideo();
             startTimeTracking();
@@ -132,12 +230,14 @@ function MusicPlayer({ songs }) {
         },
       });
     }
-    startTimeTracking();
+    if (!isStale()) startTimeTracking();
   };
 
   useEffect(() => {
-    if (songs.length > 0) initPlayer(songs[0]);
+    let cancelled = false;
+    if (songs.length > 0) initPlayer(songs[0], false, () => cancelled);
     return () => {
+      cancelled = true;
       clearInterval(intervalRef.current);
       if (playerRef.current?.destroy) {
         playerRef.current.destroy();
@@ -154,6 +254,15 @@ function MusicPlayer({ songs }) {
 
   const playSong = (index) => {
     goToIndex(index);
+    if (shuffleRef.current) {
+      const pos = shuffleOrderRef.current.indexOf(index);
+      if (pos !== -1) {
+        shufflePosRef.current = pos;
+      } else {
+        shuffleOrderRef.current = buildShuffleOrder(index);
+        shufflePosRef.current = 0;
+      }
+    }
     initPlayer(songs[index], true);
   };
 
@@ -173,8 +282,8 @@ function MusicPlayer({ songs }) {
           }
         </div>
         <div className="song-meta">
-          <div className="song-title">{currentSong.title}</div>
-          <div className="song-by">{currentSong.author}</div>
+          <Marquee text={currentSong.title} className="song-title" />
+          <Marquee text={currentSong.author} className="song-by" />
           <div className="song-sub">
             {loop
               ? '↺ Looping this song'
@@ -182,34 +291,95 @@ function MusicPlayer({ songs }) {
             }
           </div>
         </div>
+        <button
+          className={`tbtn playlist-toggle${showPlaylist ? ' on' : ''}`}
+          onClick={() => setShowPlaylist((s) => !s)}
+          title="Playlist"
+          aria-label="Toggle playlist"
+        >☰</button>
       </div>
 
       <Visualizer isPlaying={isPlaying} accent={accent.color} />
 
-      <div className="pl-header">
-        <div>#</div>
-        <div>Title</div>
-        <div>Artist</div>
-        <div>Time</div>
-        <div></div>
-      </div>
+      {showPlaylist && (
+        <div className="wmp-playlist-backdrop" onClick={() => setShowPlaylist(false)} />
+      )}
 
-      <div className="wmp-playlist">
-        {songs.map((song, i) => (
-          <div
-            key={song.song_id}
-            className={`pl-item${i === currentIndex ? ' active' : ''}`}
-            onClick={() => playSong(i)}
-          >
-            <div className="pl-num">
-              {i === currentIndex && isPlaying ? '▶' : i + 1}
-            </div>
-            <div className="pl-title">{song.title}</div>
-            <div className="pl-artist">{song.author}</div>
-            <div className="pl-dur">{i === currentIndex ? duration : ''}</div>
-            <div></div>
+      <div className={`wmp-playlist-panel${showPlaylist ? ' open' : ''}`}>
+        <div className="wmp-playlist-panel-header">
+          <div className="wmp-panel-tabs">
+            {PANEL_TABS.map(({ key, label }) => (
+              <button
+                key={key}
+                className={`wmp-panel-tab${panelTab === key ? ' active' : ''}`}
+                onClick={() => setPanelTab(key)}
+              >{label}</button>
+            ))}
           </div>
-        ))}
+          <button
+            className="playlist-panel-close"
+            onClick={() => setShowPlaylist(false)}
+            aria-label="Close playlist"
+          >✕</button>
+        </div>
+
+        {panelTab === 'tracks' ? (
+          <>
+            <div className="pl-header">
+              <div>#</div>
+              <div>Title</div>
+              <div>Artist</div>
+              <div>Time</div>
+              <div></div>
+            </div>
+
+            <div className="wmp-playlist">
+              {songs.map((song, i) => (
+                <div
+                  key={song.song_id}
+                  className={`pl-item${i === currentIndex ? ' active' : ''}`}
+                  onClick={() => {
+                    playSong(i);
+                    setShowPlaylist(false);
+                  }}
+                >
+                  <div className="pl-num">
+                    {i === currentIndex && isPlaying ? '▶' : i + 1}
+                  </div>
+                  <div className="pl-title">{song.title}</div>
+                  <div className="pl-artist">{song.author}</div>
+                  <div className="pl-dur">{i === currentIndex ? duration : ''}</div>
+                  <div></div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="wmp-playlist-switcher">
+            {playlists.length === 0 && (
+              <div className="wmp-playlist-empty">No other playlists yet.</div>
+            )}
+            {playlists.map((pl) => {
+              const isCurrent = pl.playlist_id === currentPlaylistId;
+              return (
+                <button
+                  key={pl.playlist_id}
+                  className={`wmp-playlist-switch-item${isCurrent ? ' current' : ''}`}
+                  disabled={isCurrent}
+                  onClick={() => {
+                    if (!isCurrent) onSwitchPlaylist?.(pl);
+                    setShowPlaylist(false);
+                  }}
+                >
+                  <div className="wmp-playlist-switch-title">
+                    {isCurrent && '▶ '}{pl.title}
+                  </div>
+                  <div className="wmp-playlist-switch-creator">by {pl.created_by}</div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="controls">

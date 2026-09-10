@@ -37,7 +37,10 @@ const initPool = async () => {
 
     console.log('DB connected via SSH tunnel');
   } else if (process.env.PG_CONNECTION_STRING) {
-    _pool = new Pool({ connectionString: process.env.PG_CONNECTION_STRING });
+    _pool = new Pool({
+      connectionString: process.env.PG_CONNECTION_STRING,
+      ssl: { rejectUnauthorized: false },
+    });
     console.log('DB connected via connection string');
   } else {
     _pool = new Pool();

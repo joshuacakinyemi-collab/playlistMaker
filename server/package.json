@@ -9,6 +9,7 @@
     "db:migrate": "node db/migrate.js"
   },
   "dependencies": {
+    "@supabase/server": "^1.5.3",
     "bcrypt": "^6.0.0",
     "cookie-session": "^2.1.0",
     "dotenv": "^16.4.5",

@@ -1,7 +1,32 @@
 /* ════════════════════════════════════════
+   FONTS
+════════════════════════════════════════ */
+@font-face {
+  font-family: 'Induction';
+  src: url('/fonts/Induction.otf') format('opentype');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Branding/display spots that use the Induction font — grouped here so
+   the font-family assignment lives in one place instead of being pasted
+   into each selector below (which still owns its own size/weight/spacing). */
+h2,
+.wmp-title-text,
+.wmp-brand,
+.playlist-item h3,
+.song-title,
+.prog-time {
+  font-family: var(--font-display);
+}
+
+/* ════════════════════════════════════════
    VARIABLES — Windows 7 / WMP12 Aero glass
 ════════════════════════════════════════ */
 :root {
+  --font-display: 'Induction', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+
   --accent: #0078d4;
   --accent-glow: rgba(0, 120, 212, 0.28);
   --accent2: #ff4d6d;
@@ -67,15 +92,21 @@ body {
   background:
     radial-gradient(ellipse 70% 50% at 30% 15%, rgba(255, 255, 255, 0.14) 0%, transparent 55%),
     linear-gradient(160deg, var(--desktop-1) 0%, var(--desktop-2) 100%);
-  display: flex;
-  justify-content: center;
-  padding: 2.5vh 0;
 }
 
 /* ════════════════════════════════════════
-   THE WINDOW
+   THE WINDOW — fixed + explicit left/top so
+   it can be freely dragged/resized like a
+   real desktop window. Starts centered via
+   left:50%/transform; the drag/resize logic
+   in App.jsx switches to pinned px values on
+   first interaction and clears the transform.
 ════════════════════════════════════════ */
 .wmp-app {
+  position: fixed;
+  top: 2.5vh;
+  left: 50%;
+  transform: translateX(-50%);
   width: min(1280px, 96vw);
   height: 95vh;
   display: flex;
@@ -88,7 +119,18 @@ body {
     0 25px 70px rgba(0, 0, 0, 0.55),
     0 0 0 1px rgba(0, 0, 0, 0.3),
     0 0 60px var(--accent-glow);
-  transition: width 0.2s ease, height 0.2s ease, border-radius 0.2s ease;
+  /* No width/height transition here on purpose: the width is
+     viewport-responsive (min(1280px, 96vw)) and also container-query
+     driven (mp3-player mode, sidebar collapse). Animating width would
+     make those layout changes lag behind the real size on every resize
+     (live browser resize, or the drag-resize handles), so descendants
+     flip in and out of their compact styles mid-transition and visibly
+     jitter/overlap. Border-radius alone is safe to ease.
+  */
+  transition: border-radius 0.2s ease;
+  /* Lets descendants (the sidebar, the mp3-player mode) react to the
+     window's own dragged width, not just the browser viewport. */
+  container: wmp-app / inline-size;
 }
 
 .wmp-app.windowed {
@@ -108,6 +150,54 @@ body {
   display: none;
 }
 
+.wmp-app.interacting {
+  transition: none;
+  user-select: none;
+  will-change: left, top, width, height;
+}
+
+/* ════════════════════════════════════════
+   RESIZE HANDLES — invisible strips along
+   every edge/corner of the window
+════════════════════════════════════════ */
+.wmp-resize-edge {
+  position: absolute;
+  z-index: 30;
+  touch-action: none;
+}
+
+.wmp-resize-edge.n,
+.wmp-resize-edge.s {
+  left: 12px;
+  right: 12px;
+  height: 6px;
+}
+
+.wmp-resize-edge.w,
+.wmp-resize-edge.e {
+  top: 12px;
+  bottom: 12px;
+  width: 6px;
+}
+
+.wmp-resize-edge.nw,
+.wmp-resize-edge.ne,
+.wmp-resize-edge.sw,
+.wmp-resize-edge.se {
+  width: 12px;
+  height: 12px;
+  z-index: 31;
+}
+
+.wmp-resize-edge.n { top: 0; cursor: n-resize; }
+.wmp-resize-edge.s { bottom: 0; cursor: s-resize; }
+.wmp-resize-edge.w { left: 0; cursor: w-resize; }
+.wmp-resize-edge.e { right: 0; cursor: e-resize; }
+.wmp-resize-edge.nw { top: 0; left: 0; cursor: nw-resize; }
+.wmp-resize-edge.ne { top: 0; right: 0; cursor: ne-resize; }
+.wmp-resize-edge.sw { bottom: 0; left: 0; cursor: sw-resize; }
+.wmp-resize-edge.se { bottom: 0; right: 0; cursor: se-resize; }
+
 /* ════════════════════════════════════════
    TITLEBAR
 ════════════════════════════════════════ */
@@ -126,6 +216,9 @@ body {
     color-mix(in srgb, var(--accent) 65%, black 20%) 100%
   );
   overflow: hidden;
+  cursor: move;
+  touch-action: none;
+  user-select: none;
 }
 
 .wmp-titlebar::before {
@@ -141,21 +234,33 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   font-size: 12.5px;
   font-weight: 600;
   color: #fff;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
-  letter-spacing: 0.01em;
+}
+
+.wmp-title-text {
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .wmp-title-icon {
   font-size: 13px;
+  flex-shrink: 0;
 }
 
 .wmp-winctl {
   position: relative;
+  z-index: 40;
   display: flex;
+  flex-shrink: 0;
   gap: 1px;
+  cursor: default;
 }
 
 .winbtn {
@@ -186,24 +291,43 @@ body {
   background: linear-gradient(180deg, #e88f97, #c42b3a);
 }
 
-.wmp-close-toast {
-  position: absolute;
-  top: 38px;
-  right: 8px;
-  background: var(--surface3);
-  border: 1px solid var(--border);
-  color: var(--text);
-  font-size: 12px;
-  padding: 8px 12px;
-  border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  z-index: 50;
-  animation: toast-in 0.15s ease;
+/* ════════════════════════════════════════
+   CLOSED STATE — shown instead of the app
+   window after the titlebar X is clicked
+════════════════════════════════════════ */
+.wmp-closed {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-@keyframes toast-in {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
+.wmp-closed-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  text-align: center;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+  padding: 2.5rem 2rem;
+  box-shadow:
+    0 25px 70px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+
+.wmp-closed-icon {
+  font-size: 2.5rem;
+  color: var(--accent);
+}
+
+.wmp-closed-card p {
+  padding: 0;
+  color: var(--text);
+  font-size: 0.95rem;
 }
 
 /* ════════════════════════════════════════
@@ -227,8 +351,9 @@ body {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 700;
+  letter-spacing: 0.02em;
   color: var(--accent);
   cursor: pointer;
   padding: 0.4rem 0;
@@ -382,8 +507,8 @@ body {
 }
 
 .wmp-resize-grip {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   background-image: repeating-linear-gradient(
     135deg,
     var(--text-muted) 0px,
@@ -391,7 +516,17 @@ body {
     transparent 1px,
     transparent 3px
   );
+  background-position: bottom right;
+  background-repeat: no-repeat;
   opacity: 0.5;
+  cursor: nwse-resize;
+  touch-action: none;
+  transition: opacity var(--transition);
+}
+
+.wmp-resize-grip:hover,
+.wmp-resize-grip:active {
+  opacity: 0.9;
 }
 
 /* ════════════════════════════════════════
@@ -491,6 +626,7 @@ form button[type='submit']:active {
 h2 {
   font-size: 1.35rem;
   font-weight: 700;
+  letter-spacing: 0.02em;
   color: var(--text);
   line-height: 1.15;
 }
@@ -759,8 +895,9 @@ h2::after {
 }
 
 .playlist-item h3 {
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 700;
+  letter-spacing: 0.01em;
   color: var(--text);
   line-height: 1.25;
 }
@@ -1229,13 +1366,34 @@ body.light .viz-bar-wrap {
 
 .song-meta { position: relative; flex: 1; overflow: hidden; }
 
-.song-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text);
+/* Marquee — scrolls title/author sideways only when they don't fit */
+.marquee {
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+  mask-image: linear-gradient(90deg, #000 92%, transparent 100%);
+}
+
+.marquee-track {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.marquee-track.scrolling {
+  animation: marquee-bounce 6s ease-in-out infinite;
+  padding-right: 24px;
+}
+
+@keyframes marquee-bounce {
+  0%, 12% { transform: translateX(0); }
+  50%, 62% { transform: translateX(calc(-1 * var(--marquee-distance))); }
+  100% { transform: translateX(0); }
+}
+
+.song-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--text);
 }
 
 .song-by {
@@ -1251,6 +1409,128 @@ body.light .viz-bar-wrap {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Playlist toggle (only shown in compact / mp3-player mode) */
+.playlist-toggle {
+  display: none;
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+/* Playlist drawer wrapper — plain block on desktop, slide-in panel on
+   narrow screens (see RESPONSIVE section) */
+.wmp-playlist-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.wmp-playlist-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 6px 14px;
+  background: var(--surface3);
+  border-bottom: 1px solid var(--border);
+}
+
+.wmp-panel-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.wmp-panel-tab {
+  background: none;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.wmp-panel-tab:hover { color: var(--text); }
+
+.wmp-panel-tab.active {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* Only meaningful when the panel is a toggleable overlay drawer
+   (compact mp3-player mode) — see the container query below. */
+.playlist-panel-close {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.playlist-panel-close:hover { color: var(--text); }
+
+.wmp-playlist-backdrop {
+  display: none;
+}
+
+/* Playlist switcher — lets you jump to another playlist without
+   leaving the player */
+.wmp-playlist-switcher {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.wmp-playlist-switch-item {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(127, 127, 127, 0.08);
+  transition: background 0.12s;
+}
+
+.wmp-playlist-switch-item:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.wmp-playlist-switch-item.current {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  cursor: default;
+}
+
+.wmp-playlist-switch-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wmp-playlist-switch-item.current .wmp-playlist-switch-title {
+  color: var(--accent);
+}
+
+.wmp-playlist-switch-creator {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.wmp-playlist-empty {
+  padding: 14px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 /* Playlist table */
@@ -1354,6 +1634,7 @@ body.light .viz-bar-wrap {
 
 .prog-time {
   font-size: 11px;
+  letter-spacing: 0.02em;
   color: var(--text-muted);
   min-width: 34px;
 }
@@ -1465,7 +1746,12 @@ body.light .viz-bar-wrap {
     display: grid;
     grid-template-columns: 1fr 1fr;
   }
+}
 
+/* Reacts to the app window's own dragged width (see .wmp-app's
+   `container` property), not just the browser viewport — so shrinking
+   the window with the resize grip collapses the sidebar too. */
+@container wmp-app (max-width: 860px) {
   .wmp-sidebar {
     display: none;
   }
@@ -1503,4 +1789,158 @@ body.light .viz-bar-wrap {
   }
 
   .playlist-item h3 { flex: 1 1 100%; }
+}
+
+/* ════════════════════════════════════════
+   COMPACT PLAYER — looks like a handheld
+   mp3 player: stacked art/title, marquee
+   text, playlist tucked into a side drawer.
+   Keyed off the app WINDOW's own width (container
+   query), so dragging the window small triggers it
+   even in a wide browser — not just a narrow phone.
+════════════════════════════════════════ */
+@container wmp-app (max-width: 480px) {
+  .win {
+    position: relative;
+    border-radius: 22px;
+    border-color: color-mix(in srgb, var(--accent) 22%, var(--border));
+    box-shadow:
+      0 20px 44px rgba(0, 0, 0, 0.45),
+      0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+      0 0 32px color-mix(in srgb, var(--accent) 16%, transparent);
+  }
+
+  .now-playing {
+    flex-direction: column;
+    text-align: center;
+    padding: 28px 20px 20px;
+    background:
+      radial-gradient(ellipse 130% 90% at 50% -10%, color-mix(in srgb, var(--accent) 30%, transparent) 0%, transparent 60%),
+      linear-gradient(180deg, color-mix(in srgb, var(--accent) 16%, var(--surface2)) 0%, var(--surface2) 75%);
+  }
+
+  .art {
+    width: 128px;
+    height: 128px;
+    border-radius: 18px;
+    font-size: 36px;
+    margin-bottom: 4px;
+    border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+    box-shadow:
+      0 10px 26px rgba(0, 0, 0, 0.4),
+      0 0 0 5px color-mix(in srgb, var(--accent) 14%, transparent),
+      0 0 26px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+
+  .song-meta {
+    width: 100%;
+    margin-top: 6px;
+  }
+
+  .song-title {
+    font-size: 19px;
+    letter-spacing: 0.02em;
+  }
+
+  .song-by {
+    font-size: 13px;
+    margin-top: 4px;
+  }
+
+  .marquee:not(:has(.scrolling)) {
+    text-align: center;
+  }
+
+  .song-sub {
+    margin-top: 8px;
+    text-align: center;
+  }
+
+  .playlist-toggle {
+    display: flex;
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.25);
+    border-color: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(2px);
+  }
+
+  .playlist-toggle:hover {
+    background: rgba(0, 0, 0, 0.4);
+  }
+
+  .viz-bar-wrap {
+    margin: 0 16px;
+    width: auto;
+    height: 44px;
+    border-radius: var(--radius-lg);
+  }
+
+  .pl-header {
+    display: none;
+  }
+
+  .controls {
+    background: linear-gradient(180deg, var(--surface3) 0%, var(--surface2) 100%);
+    border-top-color: color-mix(in srgb, var(--accent) 14%, var(--border));
+    padding: 16px 18px 20px;
+  }
+
+  .prog-track {
+    height: 8px;
+  }
+
+  .tbtn {
+    width: 40px;
+    height: 38px;
+    font-size: 17px;
+  }
+
+  .play-btn {
+    width: 56px;
+    height: 56px;
+    font-size: 20px;
+  }
+
+  .transport {
+    gap: 10px;
+  }
+
+  .wmp-playlist-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 20;
+  }
+
+  .wmp-playlist-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(78vw, 280px);
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.35);
+    transform: translateX(100%);
+    transition: transform 0.2s ease;
+    z-index: 21;
+  }
+
+  .wmp-playlist-panel.open {
+    transform: translateX(0);
+  }
+
+  .playlist-panel-close {
+    display: inline-flex;
+  }
+
+  .wmp-playlist {
+    max-height: none;
+  }
 }

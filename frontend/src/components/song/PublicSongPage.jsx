@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { fetchAllSongs } from '../../adapters/song-adapters.js';
+import { fetchPublicPlaylists } from '../../adapters/playlist-adapters.js';
 import MusicPlayer from '../../music.jsx';
 
-function PublicSongPage({ playlist, onBack }) {
+function PublicSongPage({ playlist, onBack, onSelectPlaylist }) {
   const [songs, setSongs] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [allPlaylists, setAllPlaylists] = useState([]);
 
   useEffect(() => {
     const loadSongs = async () => {
@@ -19,6 +21,16 @@ function PublicSongPage({ playlist, onBack }) {
     };
     loadSongs();
   }, [playlist.playlist_id]);
+
+  // Powers the player's built-in playlist switcher — fetched once, not
+  // tied to which playlist is currently open.
+  useEffect(() => {
+    const loadPlaylists = async () => {
+      const { data } = await fetchPublicPlaylists();
+      if (data) setAllPlaylists(data);
+    };
+    loadPlaylists();
+  }, []);
 
   if (isLoading) return <p>Loading songs...</p>;
   if (error) return <p className="error">Something went wrong: {error}</p>;
@@ -34,7 +46,15 @@ function PublicSongPage({ playlist, onBack }) {
         </div>
       </div>
       {songs.length > 0
-        ? <MusicPlayer key={playlist.playlist_id} songs={songs} />
+        ? (
+          <MusicPlayer
+            key={playlist.playlist_id}
+            songs={songs}
+            playlists={allPlaylists}
+            currentPlaylistId={playlist.playlist_id}
+            onSwitchPlaylist={onSelectPlaylist}
+          />
+        )
         : <p>No songs in this playlist yet.</p>
       }
     </section>
