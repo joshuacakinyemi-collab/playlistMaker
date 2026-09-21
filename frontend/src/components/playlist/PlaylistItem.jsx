@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { updatePlaylist, updateVisibility, deletePlaylist } from '../../adapters/playlist-adapters.js';
+import { updatePlaylist, deletePlaylist, exportPlaylist } from '../../adapters/playlist-adapters.js';
 import { fetchAllSongs } from '../../adapters/song-adapters.js';
 import AddSongForm from '../song/AddSongForm.jsx';
 import SongList from '../song/SongList.jsx';
@@ -10,11 +10,11 @@ function PlaylistItem({ playlist, loadPlaylists, onSelectPlaylist }) {
   const [description, setDescription] = useState(playlist.description);
   const [isExpanded, setIsExpanded] = useState(false);
   const [songs, setSongs] = useState([]);
+  const [shareCode, setShareCode] = useState(null);
 
   const loadSongs = async () => {
-    const res = await fetch(`/api/playlists/${playlist.playlist_id}/songs`)
-    const data = await res.json()
-    setSongs(data)
+    const { data } = await fetchAllSongs(playlist.playlist_id);
+    if (data) setSongs(data);
   }
 
   const handleExpand = async (e) => {
@@ -31,16 +31,16 @@ function PlaylistItem({ playlist, loadPlaylists, onSelectPlaylist }) {
     setIsEditing(false);
   };
 
-  const handleChange = async (e) => {
-    const { error } = await updateVisibility(playlist.playlist_id, e.target.checked);
-    if (error) return console.error(error);
-    loadPlaylists();
-  };
-
   const handleDelete = async () => {
     const { error } = await deletePlaylist(playlist.playlist_id);
     if (error) return console.error(error);
     loadPlaylists();
+  };
+
+  const handleShare = async () => {
+    const { data, error } = await exportPlaylist(playlist.playlist_id);
+    if (error) return console.error(error);
+    setShareCode(data);
   };
 
   if (isEditing) {
@@ -60,23 +60,22 @@ function PlaylistItem({ playlist, loadPlaylists, onSelectPlaylist }) {
         <div className="playlist-item-titles">
           <h3>{playlist.title}</h3>
           <h4>{playlist.description}</h4>
-          <span className="playlist-creator">by {playlist.created_by}</span> {/* add this */}
         </div>
-        <input
-          type="checkbox"
-          checked={playlist.is_public}
-          onChange={handleChange}
-          title="Toggle public/private"
-        />
-        <span className={playlist.is_public ? 'Public' : 'Private'}>
-          {playlist.is_public ? 'Public' : 'Private'}
-        </span>
 
         <button onClick={handleExpand}>{isExpanded ? '▲' : '▼'} Songs</button>
         <button onClick={() => onSelectPlaylist(playlist)}>▶ Play</button>
         <button onClick={() => setIsEditing(true)}>Edit</button>
+        <button onClick={handleShare}>Share</button>
         <button className="delete-btn" onClick={handleDelete}>Delete</button>
       </div>
+
+      {shareCode && (
+        <div className="share-code-box">
+          <label>Share code — copy and send this to another Playlist Maker user:</label>
+          <input type="text" readOnly value={shareCode} onFocus={(e) => e.target.select()} />
+          <button onClick={() => setShareCode(null)}>Close</button>
+        </div>
+      )}
 
       {isExpanded && (
         <div className="playlist-songs">

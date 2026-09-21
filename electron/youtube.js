@@ -1,15 +1,19 @@
+const store = require('./store');
+
 const cache = new Map();
 
 module.exports.searchYouTube = async (title, author, maxResults = 1) => {
+  const apiKey = store.getSettings().youtubeApiKey;
+  if (!apiKey) {
+    throw new Error('Add your YouTube API key in Settings before searching.');
+  }
+
   const query = `${title} ${author}`;
   const cacheKey = `${query}:${maxResults}`;
 
   if (cache.has(cacheKey)) {
     const cached = cache.get(cacheKey);
-    if (cached.expires > Date.now()) {
-      console.log(`[Youtube cache hit] ${cacheKey}`);
-      return cached.data;
-    }
+    if (cached.expires > Date.now()) return cached.data;
     cache.delete(cacheKey);
   }
 
@@ -18,7 +22,7 @@ module.exports.searchYouTube = async (title, author, maxResults = 1) => {
   url.searchParams.set('q', query);
   url.searchParams.set('type', 'video');
   url.searchParams.set('maxResults', String(maxResults));
-  url.searchParams.set('key', process.env.YOUTUBE_API_KEY);
+  url.searchParams.set('key', apiKey);
 
   const res = await fetch(url);
 

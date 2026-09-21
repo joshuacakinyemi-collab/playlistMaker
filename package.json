@@ -1,0 +1,40 @@
+{
+  "name": "playlist-maker-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Playlist Maker desktop app",
+  "author": "Joshua Akinyemi",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev:vite": "npm --prefix frontend run dev",
+    "dev:electron": "wait-on tcp:5173 && cross-env ELECTRON_START_URL=http://localhost:5173 electron .",
+    "dev": "concurrently -k \"npm:dev:vite\" \"npm:dev:electron\"",
+    "build:frontend": "npm --prefix frontend run build",
+    "dist": "npm run build:frontend && electron-builder"
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0",
+    "cross-env": "^7.0.3",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "wait-on": "^8.0.0"
+  },
+  "build": {
+    "appId": "com.shadymusic.playlistmaker",
+    "productName": "Playlist Maker",
+    "icon": "build/icon.png",
+    "files": [
+      "electron/**/*",
+      "frontend/dist/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": { "category": "public.app-category.music" },
+    "win": { "target": "nsis" },
+    "linux": { "target": "AppImage" }
+  }
+}

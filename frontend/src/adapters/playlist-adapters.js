@@ -1,8 +1,6 @@
-const handleFetch = async (url, options = {}) => {
+const call = async (fn) => {
   try {
-    const response = await fetch(url, options);
-    if (!response.ok) throw new Error(`Fetch failed. ${response.status} ${response.statusText}`);
-    const data = await response.json();
+    const data = await fn();
     return { data, error: null };
   } catch (error) {
     return { data: null, error };
@@ -10,37 +8,25 @@ const handleFetch = async (url, options = {}) => {
 };
 
 export const fetchAllPlaylists = async () => {
-  return handleFetch('/api/playlists');
-};
-
-export const fetchPublicPlaylists = async () => {
-  return handleFetch('/api/playlists/public');
+  return call(() => window.api.playlists.list());
 };
 
 export const createPlaylist = async (title, description) => {
-  return handleFetch('/api/playlists', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title, description }),
-  });
+  return call(() => window.api.playlists.create(title, description));
 };
 
 export const updatePlaylist = async (playlist_id, updates) => {
-  return handleFetch(`/api/playlists/${playlist_id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updates),
-  });
-};
-
-export const updateVisibility = async (playlist_id, is_public) => {
-  return handleFetch(`/api/playlists/${playlist_id}/visibility`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ is_public }),
-  });
+  return call(() => window.api.playlists.update(playlist_id, updates));
 };
 
 export const deletePlaylist = async (playlist_id) => {
-  return handleFetch(`/api/playlists/${playlist_id}`, { method: 'DELETE' });
+  return call(() => window.api.playlists.delete(playlist_id));
+};
+
+export const exportPlaylist = async (playlist_id) => {
+  return call(() => window.api.playlists.export(playlist_id));
+};
+
+export const importPlaylist = async (code) => {
+  return call(() => window.api.playlists.import(code));
 };

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { fetchAllSongs } from '../../adapters/song-adapters.js';
-import { fetchPublicPlaylists } from '../../adapters/playlist-adapters.js';
+import { fetchAllPlaylists } from '../../adapters/playlist-adapters.js';
 import MusicPlayer from '../../music.jsx';
 
-function PublicSongPage({ playlist, onBack, onSelectPlaylist }) {
+function SongPlayerPage({ playlist, onBack, onSelectPlaylist }) {
   const [songs, setSongs] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -26,7 +26,7 @@ function PublicSongPage({ playlist, onBack, onSelectPlaylist }) {
   // tied to which playlist is currently open.
   useEffect(() => {
     const loadPlaylists = async () => {
-      const { data } = await fetchPublicPlaylists();
+      const { data } = await fetchAllPlaylists();
       if (data) setAllPlaylists(data);
     };
     loadPlaylists();
@@ -42,7 +42,6 @@ function PublicSongPage({ playlist, onBack, onSelectPlaylist }) {
         <div className="song-page-meta">
           <h2>{playlist.title}</h2>
           <p className="song-page-desc">{playlist.description}</p>
-          <span className="playlist-creator">by {playlist.created_by}</span>
         </div>
       </div>
       {songs.length > 0
@@ -62,4 +61,4 @@ function PublicSongPage({ playlist, onBack, onSelectPlaylist }) {
 }
 
 
-export default PublicSongPage;
+export default SongPlayerPage;

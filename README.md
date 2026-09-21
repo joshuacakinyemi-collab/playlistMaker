@@ -1,202 +1,76 @@
-# Playlist App — Full-Stack Case Study
+# Playlist Maker — Desktop App
 
-WebPage: https://yoshiyatunes.onrender.com/
+A desktop playlist app built with Electron + React. Everything runs locally on your machine — no server, no accounts. Search YouTube for songs using your own YouTube Data API key, build playlists, and hand a playlist to a friend as a copy-pasteable share code.
 
-A full-stack Playlist app built with React, Express, and Postgres. Demonstrates session-based authentication, session rehydration, auth-dependent data fetching, and conditional rendering — the same patterns students use in their full-stack projects.
+## Features
 
-This is meant for people who want to share and/or Make a stylize playlist.
+- Create, edit, and delete playlists and songs, all stored locally on your device
+- Search YouTube for a song and attach it, using your own free YouTube API key (Settings)
+- Play a playlist with a built-in music player
+- Turn a playlist into a share code (Share button) and import someone else's code (My Playlists → Import)
 
-## User Stories
+## ⚠️ You need your own YouTube API key
 
-**Auth**
-- A user can register for an account with a username and password
-- A user can log in to an existing account
-- A user can log out
-- A returning user who has an active session is automatically logged in when they revisit the app
+This app does **not** ship with a YouTube API key — every person running it provides their own, and it's stored only on their own device (never committed to this repo, never sent anywhere but Google). Without a key, searching for and playing songs won't work.
 
-**Playlists**
-- A logged-in user can see all of their playlist
-- A logged-in user can create a new playlist by entering a title and a description
-- A logged-in user can make a public for other users to see, or keep it private 
-- A logged-in user can delete a playlists
-
-**Songs**
-- A logged-in user can see all songs in a playlist(or any user if the playlist is public)
-- A logged-in user can add a new song by entering a title
-- A logged-in user can mark a todo as complete or incomplete
-- A logged-in user can delete a todo
-
-## Schema
-
-```
-users
-─────────────────────────────
-user_id       SERIAL PRIMARY KEY
-username      TEXT UNIQUE NOT NULL
-password_hash TEXT NOT NULL
-
-playlists
-─────────────────────────────
-playlist_id     SERIAL PRIMARY KEY,
-title       TEXT NOT NULL,
-description    TEXT NOT NULL,
-is_public BOOLEAN NOT NULL DEFAULT FALSE,
-user_id     INT REFERENCES users(user_id) ON DELETE CASCADE
-
-songs
-─────────────────────────────
-song_id     SERIAL PRIMARY KEY,
-title       TEXT NOT NULL,
-author      TEXT NOT NULL,
-youtube_id  TEXT,
-thumbnail   TEXT,
-playlist_id     INT REFERENCES playlists(playlist_id) ON DELETE CASCADE
-```
-
-A user has many playlists. Deleting a user cascades to delete all of their playlists.
-A playlist has many songs. Deleting a playlist cascades to delete all of their songs.
-
-## API Contract
-
-### Auth endpoints
-
-| Method | Endpoint             | Request Body             | Response                          |
-| ------ | -------------------- | ------------------------ | --------------------------------- |
-| POST   | `/api/auth/register` | `{ username, password }` | `{ user_id, username }`           |
-| POST   | `/api/auth/login`    | `{ username, password }` | `{ user_id, username }`           |
-| DELETE | `/api/auth/logout`   | —                        | `{ message }`                     |
-| GET    | `/api/auth/me`       | —                        | `{ user_id, username }` or `null` |
-
-### Playlist endpoints (all require authentication)
-
-| Method | Endpoint                                  | Request Body            | Response                                                    |
-| ------ | ----------------------------------------- | ----------------------- | ----------------------------------------------------------- |
-| GET    | `/api/playists`                           | —                       | `[{ playlist_id, title, description, is_public, user_id }]` |
-| GET    | `/api/playists/public`                    | —                       | `[{ playlist_id, title, description, is_public, user_id }]` |
-| POST   | `/api/playlists`                          | `{ title, description }`| `{ playlist_id, title, description, is_public, user_id }`   |
-| PATCH  | `/api/playlists/:playlists_id`            | `{ title, description }`| `{ playlist_id, title, description, is_public, user_id }`   |
-| PATCH  | `/api/playlists/:playlist_id/visibility`  | `{ is_public }`         | `{ playlist_id, title, description, is_public, user_id }`   |
-| DELETE | `/api/playlists/:playlist_id`             | —                       | `{ playlist_id, title, description, is_public, user_id }`   |
-
-### Song endpoints (all require authentication unless playlist is public, then viewing is allow)
-
-| Method | Endpoint                             | Request Body        | Response                                     |
-| ------ | -------------------------------------| ------------------- | -------------------------------------------- |
-| GET    | `/api/playlists/:playlist_id/songs`  | —                   | `[{ song_id, title, author, playlist_id }]`  |
-| POST   | `/api/playlists/:playlist_id/songs`  | `{ title , author}` | `{ song_id, title, author, playlist_id }`    |
-| PATCH  | `/api/Songs/:Song_id`                | `{ title , author }`| `{ song_id, title, author, playlist_id }`    |
-| DELETE | `/api/Songs/:Song_id`                | —                   | `{ song_id, title, author, playlist_id }`    |
-
-### Youtube Data Handler (The thing that decide what song should be fetch)
-
-| Method | Endpoint                             | Request Body        | Response                                     |
-| ------ | -------------------------------------| ------------------- | -------------------------------------------- |
-| GET    | `/api/songs/:song_id/youtube`        | —                   | `[{ song_id, youtube_id, thumbnail }]`  |
+To get one (free):
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/) and create a project (or pick an existing one).
+2. Open **APIs & Services → Library**, search for **YouTube Data API v3**, and click **Enable**.
+3. Go to **APIs & Services → Credentials → Create Credentials → API key**, then copy the key.
+4. Open the app, click the **⚙ Settings** button in the top bar, paste the key in, and click **Save**.
 
 ## Setup
 
-### 1. Database
-
-Create a local Postgres database:
-
 ```sh
-createdb playlist_casestudy
-```
-
-### 2. Server
-
-```sh
-cd server
+git clone git@github.com:joshuacakinyemi-collab/playlistMaker.git
+cd playlistMaker
 npm install
-cp .env.template .env
+npm --prefix frontend install
 ```
 
-Open `.env` and fill in your Postgres credentials and a session secret. Then seed the database:
+Then follow the [API key steps above](#️-you-need-your-own-youtube-api-key) once the app is running.
 
-```sh
-npm run db:seed
-```
-
-Start the server:
+## Development
 
 ```sh
 npm run dev
 ```
 
-The server runs on `http://localhost:8080`.
+This runs the Vite dev server and launches Electron pointed at it, with hot reload.
 
-### 3. Frontend
-
-In a second terminal:
+## Building a distributable
 
 ```sh
-cd frontend
-npm install
-npm run dev
+npm run dist
 ```
 
-The frontend runs on `http://localhost:5173`. The Vite dev proxy forwards all `/api` requests to the Express server so session cookies work correctly.
-
-## Seed Users
-
-After running `npm run db:seed`, these accounts are available:
-
-| Username  | Password    |
-| --------  | ----------- |
-| DjRandom  | letmein123  |
-| ImNotACat | tunaTreat06 |
+Builds the frontend and packages the app (via `electron-builder`) for the current OS into `release/`.
 
 ## Application Structure
 
 ```
-swe-casestudy-7-todo-app/
-├── frontend/               # React app (Vite)
-│   ├── src/
-│   │   ├── App.jsx         # Root component: currentUser state, session rehydration, auth handlers
-│   │   ├── adapters/
-│   │   │   ├── auth-adapters.js  # Fetch adapters for /api/auth/* endpoints
-│   │   │   ├── playlist-adapters.js  # Fetch adapters for /api/playlists/* endpoints
-|   |   |   └── song-adapters.js  # Fetch adapters for /api/songs/* endpoints
-|   |   |   
-│   │   └── components/
-|   |       ├── playlist/
-|   |       |    ├── PlaylistPage.jsx    # Main app container (shown when logged in)
-|   |       |    ├── AddPlaylistForm.jsx # Form to create a new Playlist
-|   |       |    ├── PublicPlaylistsPage.jsx    # Renders a list of Playlists that are public to all users
-|   |       |    ├── PlaylistsItem.jsx    # Renders a Playlist
-|   |       |    └── PlaylistList.jsx # Renders a list of Playlists
-|   |       |
-|   |       └── song/
-|   |       |    ├── SongPage.jsx    # Main app container (shown when logged in)
-|   |       |    ├── AddSongForm.jsx # Form to add a new Song to a Playlist
-|   |       |    ├── PublicSongPage.jsx    # Renders a list of song in a public Playlists that all users can see
-|   |       |    ├── SongItem.jsx    # Renders a song
-|   |       |    └── SongList.jsx # Renders a list of song in a playlist
-|   |       |
-|   |       └── theme/
-|   |       |    ├── ThemeControls.jsx    # Main app container (shown when logged in)
-|   |       |    └── Visualizer.jsx # Form a bar that show while the music played
-|   |       |
-|   |       ├──ThemeContext.jsx # handle webpage accent color and light/dark mode
-|   |       ├── music.jsx       # Song Player 
-│   │       └── AuthPage.jsx    # Login + Register forms (shown when logged out)
-|   |
-│   └── vite.config.js      # Proxies /api requests to Express in development
-└── server/                 # Express + Postgres API
-    ├── index.js            # App entry point, route definitions
-    ├── controllers/
-    │   ├── authControllers.js  # register, login, logout, getMe
-    │   ├── playlistControllers.js  # list, create, update, update,  delete playlists
-    |   └── songControllers.js  # list, create, update, delete songs
-    ├── models/
-    │   ├── userModel.js    # SQL queries for the users table
-    |   ├── playlistModel.js    # SQL queries for the playlists table
-    │   └── songModel.js    # SQL queries for the songs table
-    ├── utils/youtubeSearch.js # fetch for youtube song
-    ├── middleware/
-    │   ├── checkAuthentication.js  # Blocks unauthenticated requests
-    │   └── logRoutes.js            # Logs each incoming request
-    └── db/
-        ├── pool.js         # Postgres connection pool
-        └── seed.js         # Creates tables and inserts sample data
+playlistMaker/
+├── build/
+│   └── icon.png              # App icon, used by electron-builder for packaging
+├── electron/                # Main process (Node) — no server, no network except YouTube search
+│   ├── main.js               # Creates the window, registers all IPC handlers
+│   ├── preload.js             # Exposes window.api to the renderer via contextBridge
+│   ├── store.js               # electron-store-backed local playlist/song/settings data
+│   ├── youtube.js             # YouTube Data API search, using the user's own API key
+│   └── share.js                # Encodes/decodes a playlist into a shareable code
+└── frontend/                 # React app (Vite), the renderer process
+    └── src/
+        ├── App.jsx             # Root component + the app's window chrome (titlebar, sidebar)
+        ├── adapters/
+        │   ├── playlist-adapters.js  # window.api.playlists.* wrappers
+        │   ├── song-adapters.js      # window.api.songs.* wrappers
+        │   └── settings-adapters.js  # window.api.settings.* wrappers
+        └── components/
+            ├── SettingsModal.jsx    # YouTube API key entry
+            ├── playlist/            # Playlist library, item, add/import forms
+            └── song/                # Song list/item, add-song (YouTube search), player page
 ```
+
+## How playlist data (and your API key) is stored
+
+Playlists, songs, and your YouTube API key live in a single local JSON file managed by `electron-store`, in the OS's standard app-data directory (e.g. `~/Library/Application Support/Playlist Maker` on macOS). This lives outside the project folder, so it's untouched by git — cloning, pulling, or resetting this repo never affects your saved playlists or key. There is no database server and nothing leaves your machine except the YouTube requests you make.

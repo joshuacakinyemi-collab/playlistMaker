@@ -32,9 +32,6 @@ h2,
   --accent2: #ff4d6d;
   --accent2-glow: rgba(255, 77, 109, 0.25);
 
-  --desktop-1: #0a1626;
-  --desktop-2: #1b3a5c;
-
   --bg: #0b0f16;
   --surface: #141a24;
   --surface2: #1a212c;
@@ -54,9 +51,6 @@ h2,
 }
 
 body.light {
-  --desktop-1: #3a6ea5;
-  --desktop-2: #a9cdec;
-
   --bg: #dbe7f5;
   --surface: #ffffff;
   --surface2: #f2f6fb;
@@ -80,7 +74,7 @@ body.light {
 }
 
 /* ════════════════════════════════════════
-   DESKTOP BACKDROP (behind the app window)
+   APP BACKGROUND
 ════════════════════════════════════════ */
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -89,117 +83,31 @@ body {
   font-size: 15px;
   line-height: 1.5;
   transition: background 0.25s;
-  background:
-    radial-gradient(ellipse 70% 50% at 30% 15%, rgba(255, 255, 255, 0.14) 0%, transparent 55%),
-    linear-gradient(160deg, var(--desktop-1) 0%, var(--desktop-2) 100%);
+  background: var(--bg);
 }
 
 /* ════════════════════════════════════════
-   THE WINDOW — fixed + explicit left/top so
-   it can be freely dragged/resized like a
-   real desktop window. Starts centered via
-   left:50%/transform; the drag/resize logic
-   in App.jsx switches to pinned px values on
-   first interaction and clears the transform.
+   THE WINDOW — fills the real (frameless)
+   Electron BrowserWindow, which supplies the
+   actual OS-level drag/resize/minimize/
+   maximize behavior. This element is just
+   the app's content, not a simulated window.
 ════════════════════════════════════════ */
 .wmp-app {
-  position: fixed;
-  top: 2.5vh;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(1280px, 96vw);
-  height: 95vh;
+  width: 100vw;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   background: var(--bg);
-  border-radius: 8px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  box-shadow:
-    0 25px 70px rgba(0, 0, 0, 0.55),
-    0 0 0 1px rgba(0, 0, 0, 0.3),
-    0 0 60px var(--accent-glow);
-  /* No width/height transition here on purpose: the width is
-     viewport-responsive (min(1280px, 96vw)) and also container-query
-     driven (mp3-player mode, sidebar collapse). Animating width would
-     make those layout changes lag behind the real size on every resize
-     (live browser resize, or the drag-resize handles), so descendants
-     flip in and out of their compact styles mid-transition and visibly
-     jitter/overlap. Border-radius alone is safe to ease.
-  */
-  transition: border-radius 0.2s ease;
   /* Lets descendants (the sidebar, the mp3-player mode) react to the
-     window's own dragged width, not just the browser viewport. */
+     window's own resized width, not just the browser viewport. */
   container: wmp-app / inline-size;
 }
 
-.wmp-app.windowed {
-  width: min(920px, 92vw);
-  height: 88vh;
-  border-radius: 10px;
-}
-
-.wmp-app.minimized {
-  height: auto;
-  width: min(420px, 92vw);
-}
-
-.wmp-app.minimized .wmp-tabbar,
-.wmp-app.minimized .wmp-body,
-.wmp-app.minimized .wmp-statusbar {
-  display: none;
-}
-
-.wmp-app.interacting {
-  transition: none;
-  user-select: none;
-  will-change: left, top, width, height;
-}
-
 /* ════════════════════════════════════════
-   RESIZE HANDLES — invisible strips along
-   every edge/corner of the window
-════════════════════════════════════════ */
-.wmp-resize-edge {
-  position: absolute;
-  z-index: 30;
-  touch-action: none;
-}
-
-.wmp-resize-edge.n,
-.wmp-resize-edge.s {
-  left: 12px;
-  right: 12px;
-  height: 6px;
-}
-
-.wmp-resize-edge.w,
-.wmp-resize-edge.e {
-  top: 12px;
-  bottom: 12px;
-  width: 6px;
-}
-
-.wmp-resize-edge.nw,
-.wmp-resize-edge.ne,
-.wmp-resize-edge.sw,
-.wmp-resize-edge.se {
-  width: 12px;
-  height: 12px;
-  z-index: 31;
-}
-
-.wmp-resize-edge.n { top: 0; cursor: n-resize; }
-.wmp-resize-edge.s { bottom: 0; cursor: s-resize; }
-.wmp-resize-edge.w { left: 0; cursor: w-resize; }
-.wmp-resize-edge.e { right: 0; cursor: e-resize; }
-.wmp-resize-edge.nw { top: 0; left: 0; cursor: nw-resize; }
-.wmp-resize-edge.ne { top: 0; right: 0; cursor: ne-resize; }
-.wmp-resize-edge.sw { bottom: 0; left: 0; cursor: sw-resize; }
-.wmp-resize-edge.se { bottom: 0; right: 0; cursor: se-resize; }
-
-/* ════════════════════════════════════════
-   TITLEBAR
+   TITLEBAR — the drag region for the real
+   OS window (-webkit-app-region: drag).
 ════════════════════════════════════════ */
 .wmp-titlebar {
   position: relative;
@@ -216,8 +124,7 @@ body {
     color-mix(in srgb, var(--accent) 65%, black 20%) 100%
   );
   overflow: hidden;
-  cursor: move;
-  touch-action: none;
+  -webkit-app-region: drag;
   user-select: none;
 }
 
@@ -250,8 +157,10 @@ body {
 }
 
 .wmp-title-icon {
-  font-size: 13px;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
+  border-radius: 50%;
 }
 
 .wmp-winctl {
@@ -261,6 +170,7 @@ body {
   flex-shrink: 0;
   gap: 1px;
   cursor: default;
+  -webkit-app-region: no-drag;
 }
 
 .winbtn {
@@ -289,45 +199,6 @@ body {
 
 .winbtn.close:hover {
   background: linear-gradient(180deg, #e88f97, #c42b3a);
-}
-
-/* ════════════════════════════════════════
-   CLOSED STATE — shown instead of the app
-   window after the titlebar X is clicked
-════════════════════════════════════════ */
-.wmp-closed {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.wmp-closed-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  text-align: center;
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 10px;
-  padding: 2.5rem 2rem;
-  box-shadow:
-    0 25px 70px rgba(0, 0, 0, 0.55),
-    0 0 0 1px rgba(0, 0, 0, 0.3);
-}
-
-.wmp-closed-icon {
-  font-size: 2.5rem;
-  color: var(--accent);
-}
-
-.wmp-closed-card p {
-  padding: 0;
-  color: var(--text);
-  font-size: 0.95rem;
 }
 
 /* ════════════════════════════════════════
@@ -361,6 +232,13 @@ body {
 }
 
 .wmp-brand:hover { opacity: 0.8; }
+
+.wmp-brand-icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
 
 .wmp-tabbar-right {
   display: flex;
@@ -432,12 +310,6 @@ body {
   padding: 0.3rem 0.5rem;
 }
 
-.wmp-sidebar-hint {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  padding: 0.2rem 0.5rem;
-}
-
 .wmp-navitem {
   all: unset;
   display: flex;
@@ -504,57 +376,6 @@ body {
   border-top: 1px solid var(--border);
   font-size: 11px;
   color: var(--text-muted);
-}
-
-.wmp-resize-grip {
-  width: 16px;
-  height: 16px;
-  background-image: repeating-linear-gradient(
-    135deg,
-    var(--text-muted) 0px,
-    var(--text-muted) 1px,
-    transparent 1px,
-    transparent 3px
-  );
-  background-position: bottom right;
-  background-repeat: no-repeat;
-  opacity: 0.5;
-  cursor: nwse-resize;
-  touch-action: none;
-  transition: opacity var(--transition);
-}
-
-.wmp-resize-grip:hover,
-.wmp-resize-grip:active {
-  opacity: 0.9;
-}
-
-/* ════════════════════════════════════════
-   HOME — two-column when auth is visible
-════════════════════════════════════════ */
-.home-view {
-  display: flex;
-  gap: 2rem;
-  align-items: flex-start;
-}
-
-.browse-col {
-  flex: 1;
-  min-width: 0;
-}
-
-.home-view--split .auth-col {
-  width: 300px;
-  flex-shrink: 0;
-}
-
-/* ════════════════════════════════════════
-   AUTH
-════════════════════════════════════════ */
-#auth-section {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
 }
 
 form {
@@ -1172,18 +993,6 @@ p.error { color: var(--accent2); }
 /* ════════════════════════════════════════
    USER / THEME CONTROLS
 ════════════════════════════════════════ */
-.user-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
-  border-radius: var(--radius);
-  font-size: 0.8rem;
-  color: var(--accent);
-}
-
 .theme-controls {
   display: flex;
   align-items: center;
@@ -1366,11 +1175,22 @@ body.light .viz-bar-wrap {
 
 .song-meta { position: relative; flex: 1; overflow: hidden; }
 
-/* Marquee — scrolls title/author sideways only when they don't fit */
+/* Marquee — scrolls title/author sideways only when they don't fit, as a
+   continuous one-directional loop (not back-and-forth). The track holds two
+   copies of the text; animating by exactly -50% makes the second copy
+   seamlessly continue where the first left off. */
 .marquee {
+  position: relative;
   overflow: hidden;
   white-space: nowrap;
   mask-image: linear-gradient(90deg, #000 92%, transparent 100%);
+}
+
+.marquee-measure {
+  position: absolute;
+  visibility: hidden;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .marquee-track {
@@ -1379,14 +1199,19 @@ body.light .viz-bar-wrap {
 }
 
 .marquee-track.scrolling {
-  animation: marquee-bounce 6s ease-in-out infinite;
-  padding-right: 24px;
+  display: flex;
+  width: max-content;
+  animation: marquee-loop var(--marquee-duration, 8s) linear infinite;
 }
 
-@keyframes marquee-bounce {
-  0%, 12% { transform: translateX(0); }
-  50%, 62% { transform: translateX(calc(-1 * var(--marquee-distance))); }
-  100% { transform: translateX(0); }
+.marquee-copy {
+  padding-right: 48px;
+  white-space: nowrap;
+}
+
+@keyframes marquee-loop {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
 }
 
 .song-title {
@@ -1733,21 +1558,6 @@ body.light .viz-bar-wrap {
 /* ════════════════════════════════════════
    RESPONSIVE
 ════════════════════════════════════════ */
-@media (max-width: 860px) {
-  .home-view--split {
-    flex-direction: column-reverse;
-  }
-
-  .home-view--split .auth-col {
-    width: 100%;
-  }
-
-  .home-view--split #auth-section {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
 /* Reacts to the app window's own dragged width (see .wmp-app's
    `container` property), not just the browser viewport — so shrinking
    the window with the resize grip collapses the sidebar too. */
@@ -1757,20 +1567,17 @@ body.light .viz-bar-wrap {
   }
 }
 
+/* Below this, "♫ Playlist Maker" + the Settings/theme controls no longer
+   fit on one tabbar row — drop the brand text (icon stays) so the tabbar
+   never wraps to a second row and eats vertical space in a short window. */
+@container wmp-app (max-width: 520px) {
+  .wmp-brand-text {
+    display: none;
+  }
+}
+
 @media (max-width: 600px) {
   body { padding: 0; }
-
-  .wmp-app {
-    width: 100vw;
-    height: 100vh;
-    border-radius: 0;
-  }
-
-  .wmp-app.windowed {
-    width: 100vw;
-    height: 100vh;
-    border-radius: 0;
-  }
 
   .wmp-tabbar {
     padding: 0.5rem 0.85rem;
@@ -1778,10 +1585,6 @@ body.light .viz-bar-wrap {
 
   .wmp-content {
     padding: 1.25rem 1rem 3rem;
-  }
-
-  .home-view--split #auth-section {
-    grid-template-columns: 1fr;
   }
 
   .playlist-item {
@@ -1800,6 +1603,27 @@ body.light .viz-bar-wrap {
    even in a wide browser — not just a narrow phone.
 ════════════════════════════════════════ */
 @container wmp-app (max-width: 480px) {
+  .wmp-content {
+    padding: 1rem 1rem 2rem;
+  }
+
+  .song-page {
+    gap: 0.6rem;
+  }
+
+  .back-btn {
+    padding: 0.3rem 0.8rem;
+    font-size: 0.8rem;
+  }
+
+  .song-page-header h2 {
+    font-size: 1.05rem;
+  }
+
+  .song-page-desc {
+    display: none;
+  }
+
   .win {
     position: relative;
     border-radius: 22px;
@@ -1943,4 +1767,81 @@ body.light .viz-bar-wrap {
   .wmp-playlist {
     max-height: none;
   }
+}
+
+/* Settings modal */
+.settings-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.settings-modal {
+  width: min(90vw, 420px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  padding: 16px 18px;
+}
+
+.settings-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.settings-modal-header h2 {
+  font-size: 15px;
+  margin: 0;
+}
+
+.settings-modal form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-modal-hint {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin: 0 0 4px;
+  line-height: 1.4;
+}
+
+.settings-modal-saved {
+  font-size: 12px;
+  color: var(--accent);
+  margin: 0;
+}
+
+/* Playlist share code */
+.share-code-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  margin-top: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.share-code-box label {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+/* Import playlist form */
+#import-playlist-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
 }

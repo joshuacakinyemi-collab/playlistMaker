@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
-import { fetchAllPlaylists } from '../../adapters/playlist-adapters.js';
-import { fetchFavorites, removeFavorite } from '../../adapters/favorite-adapters.js';
+import { fetchAllPlaylists, importPlaylist } from '../../adapters/playlist-adapters.js';
 import AddPlaylistForm from './AddPlaylistForm.jsx';
 import PlaylistList from './PlaylistList.jsx';
 
-function PlaylistPage({ currentUser, handleLogout, onSelectPlaylist }) {
+function PlaylistPage({ onSelectPlaylist }) {
   const [playlists, setPlaylists] = useState([]);
-  const [favorites, setFavorites] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [importCode, setImportCode] = useState('');
+  const [importError, setImportError] = useState(null);
 
   const loadPlaylists = async () => {
     setIsLoading(true);
@@ -19,20 +19,18 @@ function PlaylistPage({ currentUser, handleLogout, onSelectPlaylist }) {
     setIsLoading(false);
   };
 
-  const loadFavorites = async () => {
-    const { data } = await fetchFavorites();
-    if (data) setFavorites(data);
-  };
-
   useEffect(() => {
     loadPlaylists();
-    loadFavorites();
   }, []);
 
-  const handleUnfavorite = async (e, playlist_id) => {
-    e.stopPropagation();
-    await removeFavorite(playlist_id);
-    loadFavorites();
+  const handleImport = async (e) => {
+    e.preventDefault();
+    if (!importCode.trim()) return;
+    setImportError(null);
+    const { error } = await importPlaylist(importCode.trim());
+    if (error) return setImportError(error.message);
+    setImportCode('');
+    loadPlaylists();
   };
 
   return (
@@ -42,6 +40,18 @@ function PlaylistPage({ currentUser, handleLogout, onSelectPlaylist }) {
           <h2>My Library</h2>
         </div>
         <AddPlaylistForm loadPlaylists={loadPlaylists} />
+        <form id="import-playlist-form" onSubmit={handleImport}>
+          <label htmlFor="import-code-input">Import a shared playlist:</label>
+          <input
+            type="text"
+            id="import-code-input"
+            placeholder="Paste a share code"
+            value={importCode}
+            onChange={(e) => setImportCode(e.target.value)}
+          />
+          <button type="submit" disabled={!importCode.trim()}>Import</button>
+        </form>
+        {importError && <p className="error">{importError}</p>}
         {isLoading && <p>Loading playlists...</p>}
         {error && <p className="error">Something went wrong: {error}</p>}
         <PlaylistList
@@ -50,37 +60,6 @@ function PlaylistPage({ currentUser, handleLogout, onSelectPlaylist }) {
           onSelectPlaylist={onSelectPlaylist}
         />
       </div>
-
-      {favorites.length > 0 && (
-        <div className="favorites-panel">
-          <div className="library-panel-header favorites-panel-header">
-            <h2>Favorites</h2>
-          </div>
-          <ul className="favorited-list">
-            {favorites.map((playlist) => (
-              <li
-                key={playlist.playlist_id}
-                className="playlist-item favorited-item"
-                onClick={() => onSelectPlaylist(playlist)}
-                style={{ cursor: 'pointer' }}
-              >
-                <div className="playlist-item-titles" style={{ flex: 1 }}>
-                  <h3>{playlist.title}</h3>
-                  <p style={{ padding: 0 }}>{playlist.description}</p>
-                  <span className="playlist-creator">by {playlist.created_by}</span>
-                </div>
-                <button
-                  className="favorite-btn favorited"
-                  onClick={(e) => handleUnfavorite(e, playlist.playlist_id)}
-                  title="Unfavorite"
-                >
-                  ♥
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
     </div>
   );
 }
