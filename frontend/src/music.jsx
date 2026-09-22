@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import Visualizer from './components/theme/Visualizer';
 import { useTheme } from './ThemeContext';
 import { resolveSongYoutube } from './adapters/song-adapters.js';
+import { registerGamepadActions } from './gamepad.js';
 
 const PANEL_TABS = [
   { key: 'tracks', label: 'Tracks' },
@@ -275,6 +276,17 @@ function MusicPlayer({ songs, playlists = [], currentPlaylistId, onSwitchPlaylis
     }
     initPlayer(songs[index], true);
   };
+
+  // Lets a game controller's X button / bumpers drive playback while this
+  // player is on screen. Re-registered every render (no deps) so the
+  // handlers always close over the current isPlaying/songs, not stale ones.
+  useEffect(() => {
+    return registerGamepadActions({
+      onX: togglePlay,
+      onNext: () => changeSong(true),
+      onPrev: () => changeSong(false),
+    });
+  });
 
   const currentData = youtubeData[currentSong?.song_id];
 

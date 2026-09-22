@@ -934,6 +934,19 @@ h2::after {
 }
 
 /* ════════════════════════════════════════
+   FOCUS — shown for keyboard/gamepad
+   navigation, not mouse clicks (most
+   elements' own :focus rules already
+   handle the mouse-click case and take
+   precedence over this via specificity).
+════════════════════════════════════════ */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius);
+}
+
+/* ════════════════════════════════════════
    BUTTONS (generic)
 ════════════════════════════════════════ */
 button {
@@ -1845,3 +1858,112 @@ body.light .viz-bar-wrap {
   gap: 8px;
   margin: 10px 0;
 }
+
+/* ════════════════════════════════════════
+   ON-SCREEN KEYBOARD (controller text entry)
+════════════════════════════════════════ */
+.vkbd-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 60;
+}
+
+.vkbd {
+  width: 100%;
+  max-width: 560px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.4);
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+}
+
+.vkbd-preview {
+  min-height: 20px;
+  padding: 8px 10px;
+  margin-bottom: 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.vkbd-placeholder { color: var(--text-muted); }
+
+.vkbd-page-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.vkbd-caret {
+  color: var(--accent);
+  animation: vkbd-blink 1s step-end infinite;
+}
+
+@keyframes vkbd-blink {
+  50% { opacity: 0; }
+}
+
+.vkbd-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vkbd-row {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.vkbd-key {
+  flex: 1;
+  min-width: 0;
+  max-width: 46px;
+  padding: 10px 0;
+  background: linear-gradient(180deg, var(--surface2) 0%, var(--surface3) 100%);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: none;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.vkbd-key:hover { border-color: var(--accent); color: var(--accent); }
+
+.vkbd-controls {
+  margin-top: 6px;
+}
+
+.vkbd-key--wide,
+.vkbd-key--space {
+  max-width: none;
+}
+
+.vkbd-key--space { flex: 2; }
+
+.vkbd-hints {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.vkbd-hints b { color: var(--text); }

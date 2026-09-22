@@ -8,6 +8,7 @@ A desktop playlist app built with Electron + React. Everything runs locally on y
 - Search YouTube for a song and attach it, using your own free YouTube API key (Settings)
 - Play a playlist with a built-in music player
 - Turn a playlist into a share code (Share button) and import someone else's code (My Playlists → Import)
+- Full game controller support — navigate and play music without touching a mouse or keyboard
 
 ## ⚠️ You need your own YouTube API key
 
@@ -18,6 +19,29 @@ To get one (free):
 2. Open **APIs & Services → Library**, search for **YouTube Data API v3**, and click **Enable**.
 3. Go to **APIs & Services → Credentials → Create Credentials → API key**, then copy the key.
 4. Open the app, click the **⚙ Settings** button in the top bar, paste the key in, and click **Save**.
+
+## Controller support
+
+Plug in an Xbox, PlayStation, or other standard-mapping USB/Bluetooth controller and it works automatically — no setup:
+
+| Button | Action |
+| --- | --- |
+| D-pad / left stick | Move focus around the screen |
+| A / Cross | Activate the focused button, or open the on-screen keyboard on a focused text field |
+| B / Circle | Go back (closes Settings, or leaves the player for the library) |
+| Start | Open/close Settings |
+| X / Square | Play / pause |
+| LB, RB | Previous / next track |
+
+Focusing any text field (playlist title, song search, your API key, a share code) and pressing A opens a fully controller-navigable on-screen keyboard — no physical keyboard needed:
+
+| Button | Keyboard action |
+| --- | --- |
+| D-pad | Move between keys |
+| A | Type the selected key |
+| X | Toggle CAPS |
+| Y | Switch between letters and numbers/symbols |
+| B | Done (closes the keyboard and keeps what you typed) |
 
 ## Setup
 
@@ -61,12 +85,14 @@ playlistMaker/
 └── frontend/                 # React app (Vite), the renderer process
     └── src/
         ├── App.jsx             # Root component + the app's window chrome (titlebar, sidebar)
+        ├── gamepad.js           # Controller support: spatial focus navigation + button actions
         ├── adapters/
         │   ├── playlist-adapters.js  # window.api.playlists.* wrappers
         │   ├── song-adapters.js      # window.api.songs.* wrappers
         │   └── settings-adapters.js  # window.api.settings.* wrappers
         └── components/
             ├── SettingsModal.jsx    # YouTube API key entry
+            ├── GamepadKeyboard.jsx  # Controller-navigable on-screen keyboard
             ├── playlist/            # Playlist library, item, add/import forms
             └── song/                # Song list/item, add-song (YouTube search), player page
 ```

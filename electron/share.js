@@ -1,29 +1,46 @@
-const CODE_VERSION = 1;
+const zlib = require('zlib');
+
+const CODE_VERSION = 2;
+
+// A song's thumbnail is just a predictable function of its YouTube id, so
+// it's never stored in the code — the importing side regenerates it here.
+const thumbnailFor = (youtube_id) =>
+  youtube_id ? `https://i.ytimg.com/vi/${youtube_id}/hqdefault.jpg` : null;
 
 module.exports.encodePlaylist = (playlist) => {
+  // Short keys + array-of-arrays songs (instead of {title, author, ...}
+  // objects) avoid repeating field names once per song, and dropping the
+  // thumbnail avoids storing a ~50-char URL per song. gzip squeezes the
+  // result further before it's base64url-encoded.
   const payload = {
     v: CODE_VERSION,
-    title: playlist.title,
-    description: playlist.description,
-    songs: playlist.songs.map((s) => ({
-      title: s.title,
-      author: s.author,
-      youtube_id: s.youtube_id,
-      thumbnail: s.thumbnail,
-    })),
+    t: playlist.title,
+    d: playlist.description,
+    s: playlist.songs.map((song) => [song.title, song.author, song.youtube_id]),
   };
-  return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+  const compressed = zlib.gzipSync(Buffer.from(JSON.stringify(payload), 'utf8'));
+  return compressed.toString('base64url');
 };
 
 module.exports.decodeCode = (code) => {
   let payload;
   try {
-    payload = JSON.parse(Buffer.from(code, 'base64url').toString('utf8'));
+    const json = zlib.gunzipSync(Buffer.from(code, 'base64url')).toString('utf8');
+    payload = JSON.parse(json);
   } catch {
     throw new Error('That share code looks invalid.');
   }
-  if (!payload || payload.v !== CODE_VERSION || !payload.title || !Array.isArray(payload.songs)) {
+  if (!payload || payload.v !== CODE_VERSION || !payload.t || !Array.isArray(payload.s)) {
     throw new Error('That share code looks invalid.');
   }
-  return payload;
+  return {
+    title: payload.t,
+    description: payload.d,
+    songs: payload.s.map(([title, author, youtube_id]) => ({
+      title,
+      author,
+      youtube_id,
+      thumbnail: thumbnailFor(youtube_id),
+    })),
+  };
 };

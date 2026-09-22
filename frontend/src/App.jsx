@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PlaylistPage from './components/playlist/PlaylistPage';
 import SongPlayerPage from './components/song/SongPlayerPage';
 import SettingsModal from './components/SettingsModal';
+import GamepadKeyboard from './components/GamepadKeyboard';
 import ThemeControls from './components/theme/ThemeControls';
 import logo from './assets/logo.png';
+import { registerGamepadActions } from './gamepad.js';
 
 function App() {
   const [selectedPlaylist, setSelectedPlaylist] = useState(
@@ -25,6 +27,19 @@ function App() {
   };
 
   const goHome = () => selectPlaylist(null);
+
+  // B button: close Settings if it's open, else back out of the player to
+  // the library. Start button: toggle Settings. Re-registered whenever
+  // this state changes so the handlers never act on stale values.
+  useEffect(() => {
+    return registerGamepadActions({
+      onBack: () => {
+        if (settingsOpen) setSettingsOpen(false);
+        else if (selectedPlaylist) selectPlaylist(null);
+      },
+      onStart: () => setSettingsOpen((open) => !open),
+    });
+  }, [settingsOpen, selectedPlaylist]);
 
   return (
     <div className="wmp-app">
@@ -94,6 +109,7 @@ function App() {
       </div>
 
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      <GamepadKeyboard />
     </div>
   );
 }
