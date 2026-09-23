@@ -81,7 +81,9 @@ playlistMaker/
 │   ├── preload.js             # Exposes window.api to the renderer via contextBridge
 │   ├── store.js               # electron-store-backed local playlist/song/settings data
 │   ├── youtube.js             # YouTube Data API search, using the user's own API key
-│   └── share.js                # Encodes/decodes a playlist into a shareable code
+│   ├── share.js                # Encodes/decodes a playlist into a shareable code
+│   └── staticServer.js         # Serves the built app over http://127.0.0.1 (loopback only) —
+│                                #   required for YouTube playback to work, see its comments
 └── frontend/                 # React app (Vite), the renderer process
     └── src/
         ├── App.jsx             # Root component + the app's window chrome (titlebar, sidebar)

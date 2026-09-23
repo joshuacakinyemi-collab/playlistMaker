@@ -4,13 +4,15 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const store = require('./store');
 const { searchYouTube } = require('./youtube');
 const { encodePlaylist, decodeCode } = require('./share');
+const { startStaticServer } = require('./staticServer');
 
 const MIN_APP_WIDTH = 360;
 const MIN_APP_HEIGHT = 420;
 
 let mainWindow = null;
+let staticServerPort = null;
 
-function createWindow() {
+async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 960,
     height: 640,
@@ -27,8 +29,16 @@ function createWindow() {
     },
   });
 
-  const startUrl = process.env.ELECTRON_START_URL
-    || `file://${path.join(__dirname, '../frontend/dist/index.html')}`;
+  let startUrl = process.env.ELECTRON_START_URL;
+  if (!startUrl) {
+    // Serve the built app over a real (loopback-only) HTTP origin instead
+    // of file:// — see staticServer.js for why that matters for YouTube
+    // playback specifically.
+    if (staticServerPort === null) {
+      ({ port: staticServerPort } = await startStaticServer(path.join(__dirname, '../frontend/dist')));
+    }
+    startUrl = `http://127.0.0.1:${staticServerPort}/index.html`;
+  }
 
   mainWindow.loadURL(startUrl);
 
