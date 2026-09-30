@@ -11,13 +11,30 @@ const ACCENTS = [
   { color: '#7c3aed', glow: 'rgba(124,58,237,0.3)', label: 'Purple' },
 ];
 
+// Saved in the app's settings file rather than localStorage: the built app
+// is served from a new random port each launch, and localStorage is scoped
+// per origin (port included), so it came back empty after every restart.
+const loadSavedTheme = () => {
+  let saved = {};
+  try {
+    saved = window.api.settings.getSync() || {};
+  } catch {}
+  const mode = saved.themeMode ?? localStorage.getItem('theme-mode');
+  const accent = Number(saved.themeAccent ?? localStorage.getItem('theme-accent') ?? 4);
+  return {
+    isDark: mode !== 'light', // default dark
+    accentIndex: ACCENTS[accent] ? accent : 4, // default blue
+  };
+};
+
+const saveTheme = (updates) => {
+  window.api.settings.set(updates).catch((err) => console.error(err));
+};
+
 export function ThemeProvider({ children }) {
-  const [isDark, setIsDark] = useState(
-    () => localStorage.getItem('theme-mode') !== 'light' // default dark
-  );
-  const [accentIndex, setAccentIndex] = useState(
-    () => parseInt(localStorage.getItem('theme-accent') ?? '4') // default blue
-  );
+  const [initialTheme] = useState(loadSavedTheme);
+  const [isDark, setIsDark] = useState(initialTheme.isDark);
+  const [accentIndex, setAccentIndex] = useState(initialTheme.accentIndex);
 
   useEffect(() => {
     const a = ACCENTS[accentIndex];
@@ -36,13 +53,13 @@ export function ThemeProvider({ children }) {
   const toggleMode = () => {
     const next = !isDark;
     setIsDark(next);
-    localStorage.setItem('theme-mode', next ? 'dark' : 'light');
+    saveTheme({ themeMode: next ? 'dark' : 'light' });
     applyTheme(next, accentIndex);
   };
 
   const setAccent = (idx) => {
     setAccentIndex(idx);
-    localStorage.setItem('theme-accent', idx)
+    saveTheme({ themeAccent: idx });
     applyTheme(isDark, idx);
   };
 

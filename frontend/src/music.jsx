@@ -77,6 +77,7 @@ function MusicPlayer({ songs, playlists = [], currentPlaylistId, onSwitchPlaylis
   const [youtubeData, setYoutubeData] = useState({});
   const [duration, setDuration] = useState('0:00');
   const [currentTime, setCurrentTime] = useState('0:00');
+  const [playError, setPlayError] = useState(null);
 
   // Refs so onStateChange (set up once) always reads current values
   const currentIndexRef = useRef(0);
@@ -200,8 +201,13 @@ function MusicPlayer({ songs, playlists = [], currentPlaylistId, onSwitchPlaylis
   // refs — or restarting the time-tracking interval — for a component
   // that's already gone.
   const initPlayer = async (song, autoStart = false, isStale = () => false) => {
+    setPlayError(null);
     const data = await fetchYoutubeData(song);
-    if (!data || isStale()) return;
+    if (isStale()) return;
+    if (!data) {
+      setPlayError("Couldn't find a YouTube video for this song.");
+      return;
+    }
 
     await loadYoutubeAPI();
     if (isStale()) return;
@@ -225,7 +231,18 @@ function MusicPlayer({ songs, playlists = [], currentPlaylistId, onSwitchPlaylis
             else e.target.pauseVideo();
             startTimeTracking();
           },
+          onError: (e) => {
+            // 101/150: the owner doesn't allow playback outside youtube.com.
+            // 100: removed or private. Without this the player just stalls.
+            setIsPlaying(false);
+            setPlayError(
+              e.data === 101 || e.data === 150
+                ? "This video's owner doesn't allow it to play outside YouTube. Try picking a different video for this song."
+                : "This video can't be played (it may be private or removed)."
+            );
+          },
           onStateChange: (e) => {
+            if (e.data === window.YT.PlayerState.PLAYING) setPlayError(null);
             setIsPlaying(e.data === window.YT.PlayerState.PLAYING);
             if (e.data === window.YT.PlayerState.ENDED) {
               if (loopRef.current) {
@@ -246,7 +263,8 @@ function MusicPlayer({ songs, playlists = [], currentPlaylistId, onSwitchPlaylis
 
   useEffect(() => {
     let cancelled = false;
-    if (songs.length > 0) initPlayer(songs[0], false, () => cancelled);
+    // Autoplay the first song as soon as the playlist opens.
+    if (songs.length > 0) initPlayer(songs[0], true, () => cancelled);
     return () => {
       cancelled = true;
       clearInterval(intervalRef.current);
@@ -307,7 +325,7 @@ function MusicPlayer({ songs, playlists = [], currentPlaylistId, onSwitchPlaylis
           <Marquee text={currentSong.title} className="song-title" />
           <Marquee text={currentSong.author} className="song-by" />
           <div className="song-sub">
-            {loop
+            {playError ? <span className="error">{playError}</span> : loop
               ? '↺ Looping this song'
               : nextSong && <>Next: {nextSong.title} by {nextSong.author}</>
             }

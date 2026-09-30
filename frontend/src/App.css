@@ -1629,7 +1629,7 @@ body.light .viz-bar-wrap {
     font-size: 0.8rem;
   }
 
-  .song-page-header h2 {
+  .song-page-toolbar h2 {
     font-size: 1.05rem;
   }
 
@@ -1967,3 +1967,182 @@ body.light .viz-bar-wrap {
 }
 
 .vkbd-hints b { color: var(--text); }
+
+/* ════════════════════════════════════════
+   LAYOUT FIXES — keep rows from overflowing
+   or covering each other in narrow windows
+════════════════════════════════════════ */
+/* Playlist rows: give the title a real minimum width so the buttons wrap
+   onto their own line instead of squeezing the title to nothing and
+   drawing over it. */
+.playlist-item-titles {
+  flex: 1 1 10rem;
+}
+
+.playlist-item h3,
+.playlist-item h4,
+.song-item h3,
+.song-item h4 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Song rows: wrap instead of forcing the whole playlist card (and the
+   add-song form inside it) wider than the window. */
+.song-item {
+  flex-wrap: wrap;
+}
+
+.song-item h3 { flex: 1 1 8rem; }
+.song-item h4 { flex: 1 1 5rem; }
+
+.song-page-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+}
+
+.song-page-toolbar .song-page-meta {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+
+.song-page-toolbar h2,
+.song-page-toolbar .song-page-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.song-page-toolbar .back-btn {
+  align-self: center;
+  flex-shrink: 0;
+}
+
+/* Desktop player fills the pane with the track list taking whatever height
+   is left (and scrolling), so the play/skip controls are never pushed
+   under the status bar at the default window size. */
+@container wmp-app (min-width: 481px) {
+  .song-page {
+    min-height: 100%;
+  }
+
+  .wmp-content:has(.song-page) {
+    padding-bottom: 1.25rem;
+  }
+
+  .song-page .win {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .song-page .now-playing,
+  .song-page .viz-bar-wrap,
+  .song-page .controls {
+    flex-shrink: 0;
+  }
+
+  .song-page .wmp-playlist-panel {
+    flex: 1 1 0;
+    min-height: 96px;
+  }
+
+  .song-page .wmp-playlist {
+    max-height: none;
+  }
+}
+
+/* Tracks drawer in the compact player is only ~280px wide — too narrow
+   for the desktop 5-column table (the title column got ~25px). Stack the
+   artist under the title instead. */
+@container wmp-app (max-width: 480px) {
+  .pl-item {
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    grid-template-areas:
+      'num title dur'
+      'num artist dur';
+    column-gap: 8px;
+    row-gap: 1px;
+  }
+
+  .pl-num { grid-area: num; }
+  .pl-title { grid-area: title; }
+  .pl-artist { grid-area: artist; }
+  .pl-dur { grid-area: dur; }
+  .pl-item > div:last-child:empty { display: none; }
+}
+
+/* ════════════════════════════════════════
+   MP3 PLAYER MODE — the window shrinks to
+   just the player (see window:setMp3Mode in
+   electron/main.js). The compact player
+   styles above kick in from the narrow width;
+   this strips the rest of the app chrome and
+   lets the player fill the window.
+════════════════════════════════════════ */
+.mp3-mode .wmp-tabbar,
+.mp3-mode .wmp-sidebar,
+.mp3-mode .wmp-statusbar,
+.mp3-mode .song-page-toolbar {
+  display: none;
+}
+
+.mp3-mode .wmp-content {
+  display: flex;
+  padding: 10px;
+  overflow: hidden;
+}
+
+/* min-width: 0 on each level matters: flex items default to refusing to
+   shrink below their content's width, and a scrolling marquee title's
+   content is the full-length title — so a long song name would stretch
+   the whole player far wider than the window. */
+.mp3-mode .song-page {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  gap: 0;
+}
+
+.mp3-mode .win {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mp3-mode .song-meta {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.mp3-mode .now-playing {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  justify-content: center;
+}
+
+.mp3-mode .viz-bar-wrap,
+.mp3-mode .controls {
+  flex-shrink: 0;
+}
+
+/* Shrink the album art if the window is dragged shorter, rather than
+   pushing the controls off the bottom. */
+.mp3-mode .art {
+  width: clamp(64px, 100vh - 470px, 150px);
+  height: clamp(64px, 100vh - 470px, 150px);
+  flex-shrink: 0;
+}
+
+/* The "Next: …" line is one ellipsized row, but a playback error needs to
+   be read in full — let it wrap instead of trailing off the edge. */
+.song-sub .error {
+  white-space: normal;
+}

@@ -16,6 +16,14 @@ function App() {
   );
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [mp3Mode, setMp3Mode] = useState(false);
+
+  // Shrinks the window down to just the player, like a handheld mp3
+  // player; turning it off puts the window back where it was.
+  const toggleMp3Mode = (enabled = !mp3Mode) => {
+    setMp3Mode(enabled);
+    window.api.window.setMp3Mode(enabled);
+  };
 
   const selectPlaylist = (playlist) => {
     if (playlist) {
@@ -26,7 +34,10 @@ function App() {
     setSelectedPlaylist(playlist);
   };
 
-  const goHome = () => selectPlaylist(null);
+  const goHome = () => {
+    if (mp3Mode) toggleMp3Mode(false);
+    selectPlaylist(null);
+  };
 
   // B button: close Settings if it's open, else back out of the player to
   // the library. Start button: toggle Settings. Re-registered whenever
@@ -35,20 +46,24 @@ function App() {
     return registerGamepadActions({
       onBack: () => {
         if (settingsOpen) setSettingsOpen(false);
+        else if (mp3Mode) toggleMp3Mode(false);
         else if (selectedPlaylist) selectPlaylist(null);
       },
       onStart: () => setSettingsOpen((open) => !open),
     });
-  }, [settingsOpen, selectedPlaylist]);
+  }, [settingsOpen, selectedPlaylist, mp3Mode]);
 
   return (
-    <div className="wmp-app">
+    <div className={`wmp-app${mp3Mode ? ' mp3-mode' : ''}`}>
       <div className="wmp-titlebar">
         <div className="wmp-title">
           <img className="wmp-title-icon" src={logo} alt="" aria-hidden="true" />
           <span className="wmp-title-text">Playlist Maker</span>
         </div>
         <div className="wmp-winctl">
+          {mp3Mode && (
+            <button className="winbtn mp3-exit" title="Exit MP3 player mode" onClick={() => toggleMp3Mode(false)}>&#x2922;</button>
+          )}
           <button className="winbtn" title="Minimize" onClick={() => window.api.window.minimize()}>&#x2013;</button>
           <button className="winbtn" title="Maximize" onClick={() => window.api.window.maximize()}>❐</button>
           <button className="winbtn close" title="Close" onClick={() => window.api.window.close()}>&#x2715;</button>
@@ -95,8 +110,9 @@ function App() {
             ? (
               <SongPlayerPage
                 playlist={selectedPlaylist}
-                onBack={() => selectPlaylist(null)}
+                onBack={goHome}
                 onSelectPlaylist={selectPlaylist}
+                onEnterMp3Mode={() => toggleMp3Mode(true)}
               />
             )
             : <PlaylistPage onSelectPlaylist={selectPlaylist} />

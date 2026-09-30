@@ -24,11 +24,13 @@ contextBridge.exposeInMainWorld('api', {
   },
   settings: {
     get: () => invoke('settings:get'),
+    getSync: () => ipcRenderer.sendSync('settings:getSync'),
     set: (updates) => invoke('settings:set', updates),
   },
   window: {
     minimize: () => invoke('window:minimize'),
     maximize: () => invoke('window:maximize'),
     close: () => invoke('window:close'),
+    setMp3Mode: (enabled) => invoke('window:setMp3Mode', enabled),
   },
 });

@@ -3,7 +3,7 @@ import { fetchAllSongs } from '../../adapters/song-adapters.js';
 import { fetchAllPlaylists } from '../../adapters/playlist-adapters.js';
 import MusicPlayer from '../../music.jsx';
 
-function SongPlayerPage({ playlist, onBack, onSelectPlaylist }) {
+function SongPlayerPage({ playlist, onBack, onSelectPlaylist, onEnterMp3Mode }) {
   const [songs, setSongs] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -37,12 +37,15 @@ function SongPlayerPage({ playlist, onBack, onSelectPlaylist }) {
 
   return (
     <section className="song-page">
-      <button className="back-btn" onClick={onBack}>← Back</button>
-      <div className="song-page-header">
+      <div className="song-page-toolbar">
+        <button className="back-btn" onClick={onBack}>← Back</button>
         <div className="song-page-meta">
           <h2>{playlist.title}</h2>
           <p className="song-page-desc">{playlist.description}</p>
         </div>
+        <button className="back-btn mp3-mode-btn" onClick={onEnterMp3Mode} title="Shrink to a pocket mp3 player">
+          MP3 Player Mode
+        </button>
       </div>
       {songs.length > 0
         ? (

@@ -8,9 +8,14 @@ const { startStaticServer } = require('./staticServer');
 
 const MIN_APP_WIDTH = 360;
 const MIN_APP_HEIGHT = 420;
+// MP3 player mode: the window shrinks to a handheld-player shape.
+const MP3_MODE_WIDTH = 360;
+const MP3_MODE_HEIGHT = 600;
 
 let mainWindow = null;
 let staticServerPort = null;
+// Where the window was before entering MP3 mode, so exiting puts it back.
+let normalWindowState = null;
 
 async function createWindow() {
   mainWindow = new BrowserWindow({
@@ -26,6 +31,8 @@ async function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // Lets a playlist start playing as soon as it opens.
+      autoplayPolicy: 'no-user-gesture-required',
     },
   });
 
@@ -37,7 +44,10 @@ async function createWindow() {
     if (staticServerPort === null) {
       ({ port: staticServerPort } = await startStaticServer(path.join(__dirname, '../frontend/dist')));
     }
-    startUrl = `http://127.0.0.1:${staticServerPort}/index.html`;
+    // Must be "localhost", not "127.0.0.1": YouTube refuses to play most
+    // label-owned music (error 150) when the embedding page's origin is a
+    // bare IP address, even though the server itself only binds loopback.
+    startUrl = `http://localhost:${staticServerPort}/index.html`;
   }
 
   mainWindow.loadURL(startUrl);
@@ -68,6 +78,26 @@ ipcMain.handle('window:maximize', () => {
   else mainWindow.maximize();
 });
 ipcMain.handle('window:close', () => mainWindow?.close());
+
+ipcMain.handle('window:setMp3Mode', (event, enabled) => {
+  if (!mainWindow) return;
+  if (enabled) {
+    if (!normalWindowState) {
+      normalWindowState = {
+        bounds: mainWindow.getBounds(),
+        maximized: mainWindow.isMaximized(),
+      };
+    }
+    if (mainWindow.isMaximized()) mainWindow.unmaximize();
+    if (mainWindow.isFullScreen()) mainWindow.setFullScreen(false);
+    mainWindow.setSize(MP3_MODE_WIDTH, MP3_MODE_HEIGHT, true);
+  } else if (normalWindowState) {
+    const { bounds, maximized } = normalWindowState;
+    normalWindowState = null;
+    mainWindow.setBounds(bounds, true);
+    if (maximized) mainWindow.maximize();
+  }
+});
 
 // ====================================
 // IPC: playlists
@@ -158,3 +188,7 @@ ipcMain.handle('youtube:search', async (event, { title, author }) => {
 
 ipcMain.handle('settings:get', () => store.getSettings());
 ipcMain.handle('settings:set', (event, updates) => store.setSettings(updates));
+// Synchronous read so the theme can be applied before the first paint.
+ipcMain.on('settings:getSync', (event) => {
+  event.returnValue = store.getSettings();
+});
