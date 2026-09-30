@@ -1,11 +1,4 @@
-const call = async (fn) => {
-  try {
-    const data = await fn();
-    return { data, error: null };
-  } catch (error) {
-    return { data: null, error };
-  }
-};
+import { call } from './call.js';
 
 export const fetchAllSongs = async (playlist_id) => {
   return call(() => window.api.songs.list(playlist_id));

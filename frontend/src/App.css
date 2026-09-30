@@ -1,1202 +1,956 @@
 /* ════════════════════════════════════════
-   FONTS
+   PLAYLIST MAKER — styled like a text-mode
+   console menu: a DOS-style prompt for a
+   title, double-ruled boxes, an inverted
+   selection bar, a key hint bar along the
+   bottom, and a faint CRT glow over it all.
+   The same layout scales from a full desktop
+   window down to MP3 player mode.
 ════════════════════════════════════════ */
-@font-face {
-  font-family: 'Induction';
-  src: url('/fonts/Induction.otf') format('opentype');
-  font-weight: 400 700;
-  font-style: normal;
-  font-display: swap;
-}
 
-/* Branding/display spots that use the Induction font — grouped here so
-   the font-family assignment lives in one place instead of being pasted
-   into each selector below (which still owns its own size/weight/spacing). */
-h2,
-.wmp-title-text,
-.wmp-brand,
-.playlist-item h3,
-.song-title,
-.prog-time {
-  font-family: var(--font-display);
-}
-
-/* ════════════════════════════════════════
-   VARIABLES — Windows 7 / WMP12 Aero glass
-════════════════════════════════════════ */
+/* ── Tokens ─────────────────────────────── */
 :root {
-  --font-display: 'Induction', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  --font-ui: 'SF Mono', 'Cascadia Mono', Menlo, Consolas, 'DejaVu Sans Mono', 'Courier New', monospace;
+  --font-display: var(--font-ui);
 
+  /* Set at runtime from the chosen color (see ThemeContext.jsx). */
   --accent: #0078d4;
   --accent-glow: rgba(0, 120, 212, 0.28);
-  --accent2: #ff4d6d;
-  --accent2-glow: rgba(255, 77, 109, 0.25);
+  --on-accent: #fff;
+  --danger: #ff5555;
 
-  --bg: #0b0f16;
-  --surface: #141a24;
-  --surface2: #1a212c;
-  --surface3: #212a37;
-  --border: #2b3646;
-  --border-subtle: #202836;
-  --text: #e8edf5;
-  --text-muted: #8493a8;
+  /* Phosphor: every shade is tinted by the accent, like a monochrome CRT. */
+  --bg: #000;
+  --device: #030403;
+  --surface: color-mix(in srgb, var(--accent) 4%, #050505);
+  --surface2: color-mix(in srgb, var(--accent) 8%, #080808);
+  --surface3: color-mix(in srgb, var(--accent) 18%, #0c0c0c);
+  --border: color-mix(in srgb, var(--accent) 55%, #1a1a1a);
+  --border-subtle: color-mix(in srgb, var(--accent) 18%, #0a0a0a);
+  --text: color-mix(in srgb, var(--accent) 22%, #e4e4e4);
+  --text-muted: color-mix(in srgb, var(--accent) 35%, #7a7a7a);
+  --glow: 0 0 6px color-mix(in srgb, var(--accent) 45%, transparent);
+  --scanline: rgba(0, 0, 0, 0.22);
+  --field: #000;
 
-  --radius: 4px;
-  --radius-lg: 6px;
-  --radius-xl: 10px;
-  --transition: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-
-  --glass-hi: rgba(255, 255, 255, 0.5);
-  --glass-hi-soft: rgba(255, 255, 255, 0.16);
+  --radius: 0;
+  --radius-lg: 0;
+  --fast: 0.08s linear;
 }
 
+/* Light mode: dark ink on an old terminal's paper-white screen. */
 body.light {
-  --bg: #dbe7f5;
-  --surface: #ffffff;
-  --surface2: #f2f6fb;
-  --surface3: #e7eef7;
-  --border: #c3d2e3;
-  --border-subtle: #d7e2ee;
-  --text: #16202c;
-  --text-muted: #5c6c80;
-
-  --glass-hi: rgba(255, 255, 255, 0.85);
-  --glass-hi-soft: rgba(255, 255, 255, 0.4);
+  --bg: #b9b5a8;
+  --device: #e9e5d8;
+  --surface: #efebdf;
+  --surface2: #e2ddcf;
+  --surface3: #d3cdbd;
+  --border: color-mix(in srgb, var(--accent) 60%, #2a2a2a);
+  --border-subtle: #cbc5b4;
+  --text: #161616;
+  --text-muted: #5e5a50;
+  --glow: none;
+  --scanline: rgba(0, 0, 0, 0.05);
+  --field: #faf7ee;
 }
 
-/* ════════════════════════════════════════
-   RESET
-════════════════════════════════════════ */
+/* ── Reset ──────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-/* ════════════════════════════════════════
-   APP BACKGROUND
-════════════════════════════════════════ */
-body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  color: var(--text);
-  min-height: 100vh;
-  font-size: 15px;
-  line-height: 1.5;
-  transition: background 0.25s;
-  background: var(--bg);
+html, body, #root {
+  height: 100%;
 }
 
-/* ════════════════════════════════════════
-   THE WINDOW — fills the real (frameless)
-   Electron BrowserWindow, which supplies the
-   actual OS-level drag/resize/minimize/
-   maximize behavior. This element is just
-   the app's content, not a simulated window.
-════════════════════════════════════════ */
-.wmp-app {
-  width: 100vw;
+body {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--text);
+  background: var(--bg);
+  text-shadow: var(--glow);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+button, input {
+  font: inherit;
+  color: inherit;
+  text-shadow: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+:focus-visible {
+  outline: 1px dashed var(--accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  color: var(--on-accent);
+  background: var(--accent);
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--border); }
+::-webkit-scrollbar-track { background: var(--surface2); }
+
+/* ── App shell ──────────────────────────── */
+.app {
+  position: relative;
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
   overflow: hidden;
-  /* Lets descendants (the sidebar, the mp3-player mode) react to the
-     window's own resized width, not just the browser viewport. */
-  container: wmp-app / inline-size;
+  background:
+    radial-gradient(ellipse 90% 80% at 50% 45%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 75%),
+    var(--bg);
+  /* Lets the layout react to the window's own width (MP3 player mode). */
+  container: app / inline-size;
 }
 
-/* ════════════════════════════════════════
-   TITLEBAR — the drag region for the real
-   OS window (-webkit-app-region: drag).
-════════════════════════════════════════ */
-.wmp-titlebar {
+/* CRT scanlines over everything; clicks pass straight through. */
+.app::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  background: repeating-linear-gradient(180deg, transparent 0 2px, var(--scanline) 2px 3px);
+}
+
+/* Frameless window's drag bar (-webkit-app-region: drag). */
+.titlebar {
   position: relative;
-  height: 34px;
+  height: 28px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 0 4px 0 12px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--accent) 55%, white 35%) 0%,
-    color-mix(in srgb, var(--accent) 90%, black 0%) 55%,
-    color-mix(in srgb, var(--accent) 65%, black 20%) 100%
-  );
-  overflow: hidden;
   -webkit-app-region: drag;
   user-select: none;
 }
 
-.wmp-titlebar::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 55% 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0));
-  pointer-events: none;
-}
-
-.wmp-title {
-  position: relative;
+.titlebar-title {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: #fff;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
-.wmp-title-text {
-  letter-spacing: 0.02em;
+.titlebar-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  image-rendering: pixelated;
+}
+
+.titlebar-text {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  min-width: 0;
 }
 
-.wmp-title-icon {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  border-radius: 50%;
-}
-
-.wmp-winctl {
-  position: relative;
-  z-index: 40;
+.winctl {
   display: flex;
   flex-shrink: 0;
-  gap: 1px;
-  cursor: default;
+  gap: 2px;
   -webkit-app-region: no-drag;
 }
 
 .winbtn {
-  width: 30px;
-  height: 24px;
+  width: 28px;
+  height: 22px;
   border: none;
-  border-radius: 3px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.04));
-  color: #fff;
+  background: transparent;
+  color: var(--text-muted);
   font-size: 12px;
-  line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  transition: background var(--transition);
 }
 
 .winbtn:hover {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.08));
-}
-
-.winbtn:active {
-  background: rgba(0, 0, 0, 0.15);
+  background: var(--accent);
+  color: var(--on-accent);
+  text-shadow: none;
 }
 
 .winbtn.close:hover {
-  background: linear-gradient(180deg, #e88f97, #c42b3a);
+  background: var(--danger);
+  color: #000;
 }
 
-/* ════════════════════════════════════════
-   TABBAR (brand + user/theme controls)
-════════════════════════════════════════ */
-.wmp-tabbar {
-  flex-shrink: 0;
-  min-height: 42px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0 1rem;
-  flex-wrap: wrap;
-  background: linear-gradient(180deg, var(--surface2) 0%, var(--surface3) 100%);
-  border-bottom: 1px solid var(--border);
-}
-
-.wmp-brand {
-  all: unset;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 1.05rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--accent);
-  cursor: pointer;
-  padding: 0.4rem 0;
-  transition: opacity var(--transition);
-}
-
-.wmp-brand:hover { opacity: 0.8; }
-
-.wmp-brand-icon {
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
-  border-radius: 50%;
-}
-
-.wmp-tabbar-right {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0.4rem 0;
-}
-
-.wmp-glossy-btn {
-  font-family: inherit;
-  font-size: 0.8rem;
-  font-weight: 600;
-  padding: 0.4rem 0.9rem;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: linear-gradient(180deg, var(--surface) 0%, var(--surface3) 100%);
-  color: var(--text);
-  cursor: pointer;
-  transition: all var(--transition);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.4) inset;
-}
-
-.wmp-glossy-btn:hover {
-  border-color: var(--accent2);
-  color: var(--accent2);
-}
-
-.wmp-glossy-btn:active {
-  transform: translateY(1px);
-  box-shadow: none;
-}
-
-/* ════════════════════════════════════════
-   BODY LAYOUT — sidebar + content
-════════════════════════════════════════ */
-.wmp-body {
+/* The console window: a double-ruled box. */
+.device {
   flex: 1;
-  display: flex;
   min-height: 0;
+  width: min(100% - 24px, 860px);
+  margin: 0 auto 12px;
+  display: flex;
+  flex-direction: column;
+  background: var(--device);
+  border: 3px double var(--border);
+  overflow: hidden;
+  box-shadow: 0 0 28px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
-/* ════════════════════════════════════════
-   SIDEBAR (nav tree)
-════════════════════════════════════════ */
-.wmp-sidebar {
-  width: 200px;
+body.light .device { box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.35); }
+
+/* ── Screen header: Esc · C:\PATH> · actions ─ */
+.screen-header {
   flex-shrink: 0;
-  background: var(--surface2);
-  border-right: 1px solid var(--border);
-  padding: 0.9rem 0.6rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
-  overflow-y: auto;
-}
-
-.wmp-sidebar-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.wmp-sidebar-label {
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-  padding: 0.3rem 0.5rem;
-}
-
-.wmp-navitem {
-  all: unset;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.55rem;
-  padding: 0.5rem 0.6rem;
-  border-radius: var(--radius);
-  font-size: 0.85rem;
-  color: var(--text);
-  cursor: pointer;
-  transition: background var(--transition), color var(--transition);
-  box-sizing: border-box;
+  gap: 10px;
+  height: 40px;
+  padding: 0 8px;
+  background: var(--surface2);
+  border-bottom: 3px double var(--border);
 }
 
-.wmp-navitem:hover {
-  background: rgba(127, 127, 127, 0.12);
-}
-
-.wmp-navitem.active {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 80%, white 10%), var(--accent));
-  color: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-}
-
-.wmp-navitem--static {
-  cursor: default;
-}
-
-.wmp-navicon {
-  font-size: 0.9rem;
-  width: 1.1rem;
-  text-align: center;
-  flex-shrink: 0;
-}
-
-/* ════════════════════════════════════════
-   CONTENT PANE
-════════════════════════════════════════ */
-.wmp-content {
-  flex: 1;
+.screen-title {
   min-width: 0;
-  overflow-y: auto;
-  padding: 1.75rem 2rem 3rem;
-  background: var(--bg);
-}
-
-.wmp-content section {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-/* ════════════════════════════════════════
-   STATUSBAR
-════════════════════════════════════════ */
-.wmp-statusbar {
-  flex-shrink: 0;
-  height: 24px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 10px;
-  background: var(--surface2);
-  border-top: 1px solid var(--border);
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-form {
-  background: linear-gradient(180deg, var(--surface) 0%, var(--surface2) 100%);
-  padding: 1.5rem;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-  box-shadow: 0 1px 0 var(--glass-hi-soft) inset;
-}
-
-form h2 {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--text);
-  margin-bottom: 1.1rem;
-}
-
-form h2::after { display: none; }
-
-form input {
-  display: block;
-  width: 100%;
-  padding: 0.6rem 0.85rem;
-  margin-bottom: 0.7rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  font-family: inherit;
-  font-size: 0.9rem;
-  transition: border-color var(--transition), box-shadow var(--transition);
-  outline: none;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15) inset;
-}
-
-form input::placeholder { color: var(--text-muted); }
-
-form input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow);
-}
-
-form button[type='submit'] {
-  width: 100%;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 60%, white 30%) 0%, var(--accent) 55%, color-mix(in srgb, var(--accent) 75%, black 15%) 100%);
-  color: #fff;
-  border: 1px solid color-mix(in srgb, var(--accent) 70%, black 15%);
-  padding: 0.6rem 1rem;
-  border-radius: var(--radius);
-  cursor: pointer;
-  font-size: 0.88rem;
-  font-weight: 700;
-  transition: all var(--transition);
-  margin-top: 0.15rem;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset;
-}
-
-form button[type='submit']:hover {
-  filter: brightness(1.08);
-}
-
-form button[type='submit']:active {
-  transform: translateY(1px);
-}
-
-/* ════════════════════════════════════════
-   PAGE HEADINGS
-════════════════════════════════════════ */
-h2 {
-  font-size: 1.35rem;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  color: var(--text);
-  line-height: 1.15;
-}
-
-h2::after {
-  content: '';
-  display: block;
-  width: 2.25rem;
-  height: 3px;
-  background: var(--accent);
-  margin-top: 0.4rem;
-  border-radius: 2px;
-}
-
-/* ════════════════════════════════════════
-   LIBRARY PAGE (My Playlists)
-════════════════════════════════════════ */
-.library-page {
-  display: flex;
-  flex-direction: column;
-  gap: 2.25rem;
-}
-
-.library-panel,
-.favorites-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 1.15rem;
-}
-
-.library-panel-header {
-  display: flex;
-  align-items: baseline;
-  gap: 1rem;
-}
-
-.favorites-panel .library-panel-header h2::after {
-  background: var(--accent2);
-}
-
-.favorites-panel {
-  padding-top: 1.75rem;
-  border-top: 1px solid var(--border-subtle);
-}
-
-/* ════════════════════════════════════════
-   SONG PAGE
-════════════════════════════════════════ */
-.song-page {
-  gap: 1.4rem;
-}
-
-.back-btn {
-  align-self: flex-start;
-  background: linear-gradient(180deg, var(--surface) 0%, var(--surface3) 100%);
-  color: var(--text-muted);
-  border: 1px solid var(--border);
-  padding: 0.45rem 1.1rem;
-  border-radius: var(--radius);
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all var(--transition);
-}
-
-.back-btn:hover {
-  color: var(--text);
-  border-color: var(--accent);
-}
-
-.song-page-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-}
-
-.song-page-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.song-page-desc {
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  padding: 0;
-}
-
-/* ════════════════════════════════════════
-   ADD PLAYLIST / SONG FORMS
-════════════════════════════════════════ */
-#add-playlist-form,
-#add-song-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  background: linear-gradient(180deg, var(--surface) 0%, var(--surface2) 100%);
-  padding: 1.25rem 1.4rem;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-}
-
-#add-playlist-form label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.07em;
 }
 
-#add-song-form label { display: none; }
-
-#add-playlist-form input,
-#add-song-form input {
-  padding: 0.6rem 0.85rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  font-family: inherit;
-  font-size: 0.9rem;
-  outline: none;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15) inset;
-  transition: border-color var(--transition), box-shadow var(--transition);
-}
-
-#add-playlist-form input::placeholder,
-#add-song-form input::placeholder { color: var(--text-muted); }
-
-#add-playlist-form input:focus,
-#add-song-form input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow);
-}
-
-#add-playlist-form button,
-#add-song-form button {
-  align-self: flex-start;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 60%, white 30%) 0%, var(--accent) 55%, color-mix(in srgb, var(--accent) 75%, black 15%) 100%);
-  color: #fff;
-  border: 1px solid color-mix(in srgb, var(--accent) 70%, black 15%);
-  padding: 0.55rem 1.5rem;
-  border-radius: var(--radius);
-  cursor: pointer;
-  font-size: 0.85rem;
-  font-weight: 700;
-  transition: all var(--transition);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset;
-}
-
-#add-playlist-form button:hover,
-#add-song-form button:hover {
-  filter: brightness(1.08);
-}
-
-#add-playlist-form button:active,
-#add-song-form button:active {
-  transform: translateY(1px);
-}
-
-/* ════════════════════════════════════════
-   YOUTUBE SONG SEARCH RESULTS
-════════════════════════════════════════ */
-.youtube-results {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-}
-
-.results-prompt,
-.no-results {
-  font-size: 0.82rem;
-  color: var(--text-muted);
-}
-
-.youtube-result-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.youtube-result-item {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0.5rem 0.65rem;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--surface);
-  cursor: pointer;
-  transition: border-color var(--transition), background var(--transition);
-}
-
-.youtube-result-item:hover {
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-  background: var(--surface3);
-}
-
-.youtube-result-item.selected {
-  border-color: var(--accent);
-  background: var(--surface3);
-  box-shadow: 0 0 0 2px var(--accent-glow);
-}
-
-.result-thumbnail {
-  width: 84px;
-  height: 48px;
-  object-fit: cover;
-  border-radius: 3px;
-  flex-shrink: 0;
-}
-
-.result-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
+/* When the path is too long, trim it from the left so the screen
+   you're on stays visible: C:\…\NOW PLAYING> */
+.screen-path {
+  min-width: 0;
   overflow: hidden;
-}
-
-.result-video-title {
-  font-size: 0.84rem;
-  font-weight: 600;
-  color: var(--text);
   white-space: nowrap;
-  overflow: hidden;
   text-overflow: ellipsis;
+  direction: rtl;
 }
 
-.result-channel {
-  font-size: 0.75rem;
-  color: var(--text-muted);
+.screen-path > span {
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
-.add-song-actions { display: flex; gap: 0.5rem; }
+/* Blinking block cursor after the prompt. */
+.cursor {
+  flex-shrink: 0;
+  width: 0.6em;
+  height: 1.1em;
+  margin-left: 0.25ch;
+  background: var(--accent);
+  box-shadow: var(--glow);
+  animation: blink 1.06s step-end infinite;
+}
 
-/* ════════════════════════════════════════
-   LISTS
-════════════════════════════════════════ */
-#playlist-list,
-#public-playlist-list,
-#song-list,
-.favorited-list {
-  list-style: none;
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+.header-right {
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  justify-content: flex-end;
+  gap: 4px;
 }
 
-/* ════════════════════════════════════════
-   PLAYLIST ITEM
-════════════════════════════════════════ */
-.playlist-item {
-  background: linear-gradient(180deg, var(--surface) 0%, var(--surface2) 100%);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 0.9rem 1.25rem;
+/* Header buttons read as keys: [Esc] [MP3] [Setup] */
+.header-btn {
+  height: 26px;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
   display: flex;
   align-items: center;
-  gap: 0.85rem;
-  transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
+  white-space: nowrap;
 }
 
-.playlist-item:hover {
-  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.2);
+.header-btn::before { content: '['; }
+.header-btn::after { content: ']'; }
+.header-btn:hover:not(:disabled) { background: var(--accent); color: var(--on-accent); text-shadow: none; }
+.header-btn:disabled { visibility: hidden; }
+.header-btn.on { color: var(--accent); }
+
+/* ── Screen body ────────────────────────── */
+.screen {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 18px 20px;
+  /* New screens "redraw" in a couple of steps, like a terminal repaint. */
+  animation: 0.12s steps(3) both redraw;
 }
 
-.playlist-item h3 {
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  color: var(--text);
-  line-height: 1.25;
+@keyframes redraw {
+  from { opacity: 0; clip-path: inset(0 0 100% 0); }
 }
 
-.playlist-item h4,
-.playlist-item p {
-  font-size: 0.83rem;
-  font-weight: 400;
-  color: var(--text-muted);
-  line-height: 1.4;
+@media (prefers-reduced-motion: reduce) {
+  .screen { animation: none; }
+  .cursor { animation: none; }
+  .marquee-track.scrolling { animation: none; }
 }
 
-.playlist-item span {
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 0.2rem 0.6rem;
-  border-radius: 3px;
-  flex-shrink: 0;
+.screen-message {
+  padding: 24px 4px;
+  text-align: center;
 }
 
-.playlist-item span.Public {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+.muted { color: var(--text-muted); }
+.small { font-size: 12px; }
+.error { color: var(--danger); font-size: 13px; }
+.error::before { content: '! '; font-weight: 700; }
+.np-status .error::before, .mini-artist.error::before { content: ''; }
+
+.saved-note {
   color: var(--accent);
-  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  font-size: 13px;
+  font-weight: 700;
 }
 
-.playlist-item span.Private {
-  background: rgba(127, 127, 127, 0.1);
-  color: var(--text-muted);
-  border: 1px solid var(--border);
+h2 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-transform: uppercase;
 }
 
-.playlist-item input[type='checkbox'] {
-  width: 1rem;
-  height: 1rem;
-  cursor: pointer;
-  accent-color: var(--accent);
-  flex-shrink: 0;
+/* ── Menus: the heart of the UI ─────────── */
+/* Each menu is a ruled box with its label set into the top border. */
+.menu-group {
+  position: relative;
+  margin: 10px 0 22px;
 }
 
-.playlist-item input[type='text'] {
+.menu-label {
+  position: absolute;
+  z-index: 1;
+  top: -0.7em;
+  left: 12px;
+  padding: 0 6px;
+  background: var(--device);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.menu-label::before { content: '[ '; color: var(--text-muted); }
+.menu-label::after { content: ' ]'; color: var(--text-muted); }
+
+.menu {
+  list-style: none;
+  padding: 8px 0 4px;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  font-family: inherit;
-  font-size: 0.9rem;
-  padding: 0.45rem 0.75rem;
-  outline: none;
-  flex: 1;
-  transition: border-color var(--transition);
+  border: 3px double var(--border);
+  overflow: hidden;
 }
 
-.playlist-item input[type='text']:focus { border-color: var(--accent); }
+.menu-group:not(:has(.menu-label)) .menu { padding-top: 4px; }
 
-.playlist-item--expandable {
-  flex-direction: column;
-  align-items: stretch;
-}
-
-.playlist-item-row {
+.menu-item {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 0.7rem;
-  flex-wrap: wrap;
-}
-
-.playlist-item-titles {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  flex: 1;
   min-width: 0;
 }
 
-.playlist-songs {
-  margin-top: 0.9rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.8rem;
-  padding-top: 0.9rem;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.playlist-creator {
-  font-size: 0.76rem;
-  color: var(--text-muted);
-  font-style: italic;
-}
-
-/* Public playlist item: subtle row banding like a WMP list view */
-#public-playlist-list .playlist-item {
-  cursor: pointer;
-}
-
-#public-playlist-list .playlist-item:hover {
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-  transform: translateX(2px);
-}
-
-/* Favorited items in My Library */
-.favorited-item {
-  background: linear-gradient(135deg, var(--surface) 0%, color-mix(in srgb, var(--accent2) 6%, transparent) 100%);
-  border-color: color-mix(in srgb, var(--accent2) 18%, transparent);
-}
-
-.favorited-item:hover {
-  border-color: color-mix(in srgb, var(--accent2) 40%, transparent) !important;
-}
-
-/* ════════════════════════════════════════
-   PLAYLIST FILTERS
-════════════════════════════════════════ */
-.playlist-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.clear-filter-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  color: var(--accent);
-  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
-  border-radius: var(--radius);
-  padding: 0.26rem 0.75rem;
-  font-size: 0.76rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition);
-}
-
-.clear-filter-btn:hover {
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
-}
-
-.creator-tag {
-  all: unset;
-  font-size: 0.76rem;
-  color: var(--accent);
-  font-style: italic;
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  width: fit-content;
-  transition: opacity var(--transition);
-}
-
-.creator-tag:hover { opacity: 0.7; }
-
-/* ════════════════════════════════════════
-   FAVORITE BUTTON
-════════════════════════════════════════ */
-.favorite-btn {
-  all: unset;
-  font-size: 1.25rem;
-  line-height: 1;
-  cursor: pointer;
-  color: var(--text-muted);
-  transition: color var(--transition), transform var(--transition);
-  flex-shrink: 0;
-  padding: 0.25rem;
-}
-
-.favorite-btn:hover {
-  color: var(--accent2);
-  transform: scale(1.15);
-}
-
-.favorite-btn.favorited { color: var(--accent2); }
-
-/* ════════════════════════════════════════
-   SONG ITEM
-════════════════════════════════════════ */
-.song-item {
-  background: linear-gradient(180deg, var(--surface) 0%, var(--surface2) 100%);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.8rem 1.25rem;
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  transition: border-color var(--transition), background var(--transition);
-}
-
-.song-item::before {
-  content: '♫';
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  flex-shrink: 0;
-}
-
-.song-item:hover {
-  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
-}
-
-.song-item h3 {
-  font-size: 0.92rem;
-  font-weight: 600;
+.menu-row {
   flex: 1;
-}
-
-.song-item h4 {
-  font-size: 0.83rem;
-  font-weight: 400;
-  color: var(--text-muted);
-  flex: 1;
-}
-
-/* ════════════════════════════════════════
-   FOCUS — shown for keyboard/gamepad
-   navigation, not mouse clicks (most
-   elements' own :focus rules already
-   handle the mouse-click case and take
-   precedence over this via specificity).
-════════════════════════════════════════ */
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: var(--radius);
-}
-
-/* ════════════════════════════════════════
-   BUTTONS (generic)
-════════════════════════════════════════ */
-button {
-  font-family: inherit;
-  cursor: pointer;
-  transition: all var(--transition);
-}
-
-.delete-btn {
-  background: transparent;
-  color: var(--accent2);
-  border: 1px solid color-mix(in srgb, var(--accent2) 30%, transparent);
-  padding: 0.3rem 0.7rem;
-  border-radius: var(--radius);
-  font-size: 0.8rem;
-  flex-shrink: 0;
-}
-
-.delete-btn:hover {
-  background: color-mix(in srgb, var(--accent2) 10%, transparent);
-  border-color: var(--accent2);
-}
-
-.playlist-item button:not(.delete-btn):not(.favorite-btn):not(.creator-tag),
-.song-item button:not(.delete-btn) {
-  background: linear-gradient(180deg, var(--surface) 0%, var(--surface3) 100%);
-  color: var(--text-muted);
-  border: 1px solid var(--border);
-  padding: 0.3rem 0.7rem;
-  border-radius: var(--radius);
-  font-size: 0.8rem;
-  flex-shrink: 0;
-}
-
-.playlist-item button:not(.delete-btn):not(.favorite-btn):not(.creator-tag):hover,
-.song-item button:not(.delete-btn):hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-/* ════════════════════════════════════════
-   ERROR / TEXT
-════════════════════════════════════════ */
-.error {
-  color: var(--accent2);
-  font-size: 0.83rem;
-}
-
-p {
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  padding: 0.7rem 0;
-}
-
-p.error { color: var(--accent2); }
-
-/* ════════════════════════════════════════
-   USER / THEME CONTROLS
-════════════════════════════════════════ */
-.theme-controls {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.color-swatches {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.swatch {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  cursor: pointer;
-  border: 2px solid transparent;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.4) inset;
-  transition: border-color var(--transition), transform var(--transition);
-}
-
-.swatch:hover { transform: scale(1.15); }
-.swatch.selected { border-color: var(--text); }
-
-.mode-toggle {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  cursor: pointer;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  background: none;
+  padding: 6px 12px 6px 6px;
   border: none;
-  padding: 0;
-  transition: color var(--transition);
-}
-
-.mode-toggle:hover { color: var(--text); }
-
-/* ════════════════════════════════════════
-   USER CONTROLS (legacy SongPage)
-════════════════════════════════════════ */
-#user-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: linear-gradient(180deg, var(--surface) 0%, var(--surface2) 100%);
-  padding: 0.9rem 1.4rem;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-  font-size: 0.9rem;
-}
-
-#user-controls strong { color: var(--accent); }
-
-#user-controls button {
   background: transparent;
-  color: var(--accent2);
-  border: 1px solid color-mix(in srgb, var(--accent2) 30%, transparent);
-  padding: 0.4rem 1rem;
-  border-radius: var(--radius);
-  font-size: 0.84rem;
+  text-align: left;
 }
 
-#user-controls button:hover {
-  background: color-mix(in srgb, var(--accent2) 10%, transparent);
-  border-color: var(--accent2);
-}
-
-/* ════════════════════════════════════════
-   SEARCH INPUT (sidebar / filters)
-════════════════════════════════════════ */
-.sidebar-search {
-  flex: 1;
-  min-width: 140px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.6rem 0.9rem;
-  font-size: 0.88rem;
-  color: var(--text);
-  outline: none;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15) inset;
-  transition: border-color var(--transition), box-shadow var(--transition);
-  font-family: inherit;
-}
-
-.sidebar-search:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow);
-}
-
-.sidebar-search::placeholder { color: var(--text-muted); }
-
-/* ════════════════════════════════════════
-   VISUALIZER
-════════════════════════════════════════ */
-.viz-bar-wrap {
-  height: 48px;
-  background: rgba(0, 0, 0, 0.35);
-  border-radius: var(--radius);
-  display: flex;
-  align-items: flex-end;
-  padding: 0 4px;
-  gap: 1.5px;
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) inset;
-}
-
-body.light .viz-bar-wrap {
-  background: rgba(0, 0, 0, 0.12);
-}
-
-.viz-bar {
-  flex: 1;
-  border-radius: 1px 1px 0 0;
-  min-width: 2px;
-  background: var(--accent);
-  transition: height 0.08s;
-}
-
-/* ════════════════════════════════════════
-   WMP MUSIC PLAYER — Now Playing dock
-════════════════════════════════════════ */
-.win {
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  background: var(--surface);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4), 0 1px 0 var(--glass-hi-soft) inset;
-}
-
-.now-playing {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 18px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--accent) 30%, var(--surface2) 70%) 0%,
-    var(--surface2) 70%
-  );
-  border-bottom: 1px solid var(--border);
-  overflow: hidden;
-}
-
-.now-playing::before {
+/* The pointer column: ► marks the row you're on. */
+.menu-row::before {
   content: '';
-  position: absolute;
-  inset: 0 0 65% 0;
-  background: linear-gradient(180deg, var(--glass-hi-soft), rgba(255, 255, 255, 0));
+  width: 1.5ch;
+  flex-shrink: 0;
+  text-align: center;
+  color: var(--accent);
+}
+
+.menu-row:hover::before { content: '►'; }
+.menu-row:hover .menu-title { color: var(--accent); }
+
+/* The classic text-mode selection bar: the whole row inverted. Shown on
+   whatever the keyboard or controller has focused. */
+.menu-row:focus-visible {
+  outline: none;
+  color: var(--on-accent);
+  background: var(--accent);
+  text-shadow: none;
+}
+
+.menu-row:focus-visible::before { content: '►'; color: inherit; }
+
+.menu-row:focus-visible .menu-title,
+.menu-row:focus-visible .menu-detail,
+.menu-row:focus-visible .menu-icon,
+.menu-row:focus-visible .menu-chevron {
+  color: inherit;
+}
+
+.menu-row:focus-visible .menu-detail { opacity: 0.8; }
+
+.menu-row.danger { color: var(--danger); }
+
+/* The row that's playing right now. */
+.menu-item.active .menu-title,
+.menu-item.active .menu-icon {
+  color: var(--accent);
+}
+
+.menu-item.active .menu-title::after {
+  content: ' ◄';
+}
+
+.menu-item.active .menu-row:focus-visible .menu-title,
+.menu-item.active .menu-row:focus-visible .menu-icon {
+  color: inherit;
+}
+
+.menu-icon {
+  width: 3ch;
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.menu-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.menu-title,
+.menu-detail {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.menu-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.menu-detail {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.menu-chevron {
+  flex-shrink: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.menu-check {
+  flex-shrink: 0;
+  width: 3ch;
+  text-align: center;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.menu-empty {
+  padding: 12px 16px;
+  color: var(--text-muted);
+}
+
+.menu-empty::before { content: '> '; color: var(--accent); }
+
+.row-action {
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 6px;
+  margin-right: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.row-action:hover {
+  background: var(--accent);
+  color: var(--on-accent);
+  text-shadow: none;
+}
+
+/* On/off rows end in a text toggle: [ ON] / [OFF] */
+.switch {
+  flex-shrink: 0;
+  margin-right: 12px;
+  font-weight: 700;
+  white-space: pre;
+  color: var(--text-muted);
   pointer-events: none;
 }
 
-.art {
+.switch::after { content: '[OFF]'; }
+.switch.on { color: var(--accent); }
+.switch.on::after { content: '[ ON]'; }
+
+.menu-row:focus-visible + .switch { color: var(--accent); }
+
+.swatch-row {
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 6px 12px 6px calc(6px + 1.5ch + 10px);
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.swatch {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--device);
+  outline: 1px solid transparent;
+  box-shadow: none;
+}
+
+.swatch:hover { outline-color: var(--text-muted); }
+
+.swatch.selected {
+  outline: 2px solid var(--text);
+}
+
+/* Custom color: a color input dressed as one more swatch; a dashed
+   outline marks it as "pick your own" until it's the chosen color. */
+.swatch-custom {
   position: relative;
-  width: 56px;
-  height: 56px;
+  padding: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  background: none;
+  cursor: pointer;
+}
+
+.swatch-custom::-webkit-color-swatch-wrapper { padding: 0; }
+.swatch-custom::-webkit-color-swatch { border: none; }
+
+.swatch-custom:not(.selected) {
+  outline: 1px dashed var(--text-muted);
+}
+
+/* ── Buttons: [ Label ] ─────────────────── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 0 6px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pill::before { content: '['; color: var(--text-muted); }
+.pill::after { content: ']'; color: var(--text-muted); }
+
+.pill:hover:not(:disabled),
+.pill:focus-visible {
+  outline: none;
+  color: var(--on-accent);
+  background: var(--accent);
+  text-shadow: none;
+}
+
+.pill:hover:not(:disabled)::before,
+.pill:hover:not(:disabled)::after,
+.pill:focus-visible::before,
+.pill:focus-visible::after { color: inherit; }
+
+.pill.primary { color: var(--accent); }
+
+.pill.danger { color: var(--danger); }
+
+.pill.danger:hover,
+.pill.danger:focus-visible,
+.pill.danger.confirm {
+  color: #000;
+  background: var(--danger);
+}
+
+.pill.danger.confirm::before,
+.pill.danger.confirm::after { color: inherit; }
+
+.pill.wide {
+  width: 100%;
+  min-height: 32px;
+  margin-top: 4px;
+}
+
+.action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin-bottom: 22px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--border-subtle);
+}
+
+/* ── Panels & forms ─────────────────────── */
+.panel {
+  margin: 10px 0 22px;
+  padding: 14px;
+  background: var(--surface);
+  border: 3px double var(--border);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form label,
+.share-panel label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.form label:not(:first-child) {
+  margin-top: 6px;
+}
+
+input[type='text'],
+.song-edit input {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--field);
+  caret-color: var(--accent);
+  outline: none;
+}
+
+input[type='text']::placeholder,
+.song-edit input::placeholder { color: var(--text-muted); opacity: 0.7; }
+
+input[type='text']:focus,
+.song-edit input:focus {
+  border-color: var(--accent);
+}
+
+.share-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+}
+
+.song-edit {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border-top: 1px dashed var(--border);
+  border-bottom: 1px dashed var(--border);
+}
+
+/* Thumbnails are shown tinted in the phosphor color. */
+.result-thumb,
+.playlist-cover img,
+.np-art img,
+.mini-art img {
+  filter: grayscale(1) contrast(1.15);
+}
+
+.result-thumb {
+  width: 64px;
+  height: 36px;
+  flex-shrink: 0;
+  object-fit: cover;
   background: var(--surface3);
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+}
+
+.add-song-btn {
+  margin-top: 12px;
+}
+
+/* A tint layer (and its own scanlines) laid over artwork boxes. */
+.playlist-cover,
+.np-art,
+.mini-art {
+  position: relative;
+}
+
+.playlist-cover::after,
+.np-art::after,
+.mini-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 2px, rgba(0, 0, 0, 0.3) 2px 3px),
+    var(--accent);
+  mix-blend-mode: multiply;
+}
+
+body.light .playlist-cover::after,
+body.light .np-art::after,
+body.light .mini-art::after {
+  mix-blend-mode: screen;
+  background: color-mix(in srgb, var(--accent) 55%, #000);
+}
+
+/* Tint Artwork off: thumbnails keep their real colors. */
+body.art-natural .result-thumb,
+body.art-natural .playlist-cover img,
+body.art-natural .np-art img,
+body.art-natural .mini-art img {
+  filter: none;
+}
+
+body.art-natural .playlist-cover::after,
+body.art-natural .np-art::after,
+body.art-natural .mini-art::after {
+  content: none;
+}
+
+/* ── Playlist screen header ─────────────── */
+.playlist-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
+  min-width: 0;
+}
+
+.playlist-cover {
+  width: 142px;
+  aspect-ratio: 16 / 9;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
-  color: var(--text-muted);
-  flex-shrink: 0;
   overflow: hidden;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  border: 3px double var(--border);
+  background: var(--surface2);
+  color: var(--accent);
+  font-size: 30px;
 }
 
-.art img {
+.playlist-cover:not(:has(img))::after { content: none; }
+
+.playlist-cover img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.song-meta { position: relative; flex: 1; overflow: hidden; }
+.playlist-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 
-/* Marquee — scrolls title/author sideways only when they don't fit, as a
-   continuous one-directional loop (not back-and-forth). The track holds two
-   copies of the text; animating by exactly -50% makes the second copy
-   seamlessly continue where the first left off. */
-.marquee {
-  position: relative;
+.playlist-info h2 {
+  overflow-wrap: anywhere;
+}
+
+/* ── Now Playing ────────────────────────── */
+.screen--now-playing {
+  display: flex;
+  padding: 16px 20px 20px;
+}
+
+.now-playing {
+  flex: 1;
+  min-width: 0;
+  min-height: 100%;
+  width: 100%;
+  max-width: 540px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.np-art {
+  width: min(100%, clamp(170px, (100vh - 440px) * 16 / 9, 430px));
+  aspect-ratio: 16 / 9;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 3px double var(--border);
+  background: var(--surface2);
+  color: var(--accent);
+  font-size: 44px;
+  box-shadow: 0 0 24px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.np-art:not(:has(img))::after { content: none; }
+
+.np-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.np-meta {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.np-meta .marquee { width: 100%; }
+
+.np-title {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.np-artist {
+  font-size: 14px;
+  color: var(--accent);
+}
+
+.np-playlist {
+  max-width: 100%;
+  padding: 1px 6px;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  color: var(--text-muted);
   overflow: hidden;
   white-space: nowrap;
-  mask-image: linear-gradient(90deg, #000 92%, transparent 100%);
+  text-overflow: ellipsis;
+}
+
+.np-playlist::before { content: 'DIR: '; }
+.np-playlist:hover { color: var(--on-accent); background: var(--accent); text-shadow: none; }
+
+.np-status {
+  width: 100%;
+  min-height: 1.2em;
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* An error needs reading in full, so let it wrap. */
+.np-status .error {
+  white-space: normal;
+}
+
+.np-progress {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.np-time {
+  min-width: 5ch;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.np-time:last-child { text-align: right; }
+
+/* Progress drawn as a row of block characters: ▮▮▮▮▯▯▯ */
+.np-track {
+  position: relative;
+  flex: 1;
+  height: 12px;
+  background: repeating-linear-gradient(90deg, var(--surface3) 0 6px, transparent 6px 8px);
+  cursor: pointer;
+}
+
+/* Taller invisible hit area so the bar is easy to click. */
+.np-track::before {
+  content: '';
+  position: absolute;
+  inset: -6px 0;
+}
+
+.np-fill {
+  height: 100%;
+  background: repeating-linear-gradient(90deg, var(--accent) 0 6px, transparent 6px 8px);
+  filter: drop-shadow(0 0 4px var(--accent-glow));
+  transition: width 0.5s steps(4);
+}
+
+/* Marquee — scrolls a title sideways only when it doesn't fit, as one
+   continuous loop: the track holds two copies of the text and slides by
+   exactly -50%, so the second copy picks up where the first left off. */
+.marquee {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .marquee-measure {
@@ -1218,298 +972,38 @@ body.light .viz-bar-wrap {
 }
 
 .marquee-copy {
-  padding-right: 48px;
-  white-space: nowrap;
+  padding-right: 6ch;
 }
 
 @keyframes marquee-loop {
-  from { transform: translateX(0); }
   to { transform: translateX(-50%); }
 }
 
-.song-title {
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  color: var(--text);
-}
-
-.song-by {
-  font-size: 12px;
-  color: var(--accent);
-  margin-top: 2px;
-}
-
-.song-sub {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Playlist toggle (only shown in compact / mp3-player mode) */
-.playlist-toggle {
-  display: none;
-  flex-shrink: 0;
-  align-self: flex-start;
-}
-
-/* Playlist drawer wrapper — plain block on desktop, slide-in panel on
-   narrow screens (see RESPONSIVE section) */
-.wmp-playlist-panel {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.wmp-playlist-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 8px 6px 14px;
-  background: var(--surface3);
-  border-bottom: 1px solid var(--border);
-}
-
-.wmp-panel-tabs {
-  display: flex;
-  gap: 4px;
-}
-
-.wmp-panel-tab {
-  background: none;
-  border: 1px solid transparent;
-  color: var(--text-muted);
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 4px 10px;
-  border-radius: var(--radius);
-  cursor: pointer;
-  transition: all var(--transition);
-}
-
-.wmp-panel-tab:hover { color: var(--text); }
-
-.wmp-panel-tab.active {
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
-}
-
-/* Only meaningful when the panel is a toggleable overlay drawer
-   (compact mp3-player mode) — see the container query below. */
-.playlist-panel-close {
-  display: none;
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 13px;
-  cursor: pointer;
-  padding: 2px 4px;
-}
-
-.playlist-panel-close:hover { color: var(--text); }
-
-.wmp-playlist-backdrop {
-  display: none;
-}
-
-/* Playlist switcher — lets you jump to another playlist without
-   leaving the player */
-.wmp-playlist-switcher {
-  overflow-y: auto;
-  flex: 1;
-}
-
-.wmp-playlist-switch-item {
-  all: unset;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+/* Visualizer bars (heights animated from Visualizer.jsx), chopped into
+   blocks like a text-mode spectrum analyser. */
+.viz-bar-wrap {
   width: 100%;
-  padding: 10px 14px;
-  cursor: pointer;
-  border-bottom: 1px solid rgba(127, 127, 127, 0.08);
-  transition: background 0.12s;
-}
-
-.wmp-playlist-switch-item:hover {
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-}
-
-.wmp-playlist-switch-item.current {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  cursor: default;
-}
-
-.wmp-playlist-switch-title {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.wmp-playlist-switch-item.current .wmp-playlist-switch-title {
-  color: var(--accent);
-}
-
-.wmp-playlist-switch-creator {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.wmp-playlist-empty {
-  padding: 14px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-/* Playlist table */
-.pl-header {
-  display: grid;
-  grid-template-columns: 28px 1fr 110px 52px 36px;
-  padding: 6px 14px;
-  background: var(--surface2);
-  border-bottom: 1px solid var(--border);
-  font-size: 10px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.wmp-playlist {
-  overflow-y: auto;
-  flex: 1;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-  max-height: 340px;
-}
-
-.pl-item {
-  display: grid;
-  grid-template-columns: 28px 1fr 110px 52px 36px;
-  align-items: center;
-  padding: 7px 14px;
-  font-size: 12px;
-  color: var(--text-muted);
-  cursor: pointer;
-  border-bottom: 1px solid rgba(127, 127, 127, 0.08);
-  transition: background 0.12s;
-}
-
-.pl-item:nth-child(even) {
-  background: rgba(127, 127, 127, 0.035);
-}
-
-.pl-item:hover {
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-  color: var(--text);
-}
-
-.pl-item.active {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  color: var(--text);
-}
-
-.pl-item.active .pl-num { color: var(--accent); }
-
-.pl-num { color: var(--text-muted); font-size: 11px; text-align: center; }
-
-.pl-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 500;
-}
-
-.pl-artist {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.pl-dur {
-  text-align: right;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.pl-heart {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-  color: var(--text-muted);
-  padding: 0;
-  transition: color 0.15s;
-  text-align: center;
-}
-
-.pl-heart.faved { color: var(--accent2); }
-
-/* Transport controls */
-.controls {
-  background: linear-gradient(180deg, var(--surface2) 0%, var(--surface3) 100%);
-  border-top: 1px solid var(--border);
-  padding: 10px 16px 14px;
-}
-
-.prog-row {
+  height: 44px;
+  flex-shrink: 0;
   display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 0 6px;
+  border-top: 1px dashed var(--border-subtle);
+  border-bottom: 1px dashed var(--border-subtle);
+  overflow: hidden;
+  -webkit-mask-image: repeating-linear-gradient(0deg, #000 0 3px, transparent 3px 4px);
+  mask-image: repeating-linear-gradient(0deg, #000 0 3px, transparent 3px 4px);
 }
 
-.prog-time {
-  font-size: 11px;
-  letter-spacing: 0.02em;
-  color: var(--text-muted);
-  min-width: 34px;
-}
-
-.prog-time.r { text-align: right; }
-
-.prog-track {
+.viz-bar {
   flex: 1;
-  height: 6px;
-  background: var(--surface3);
-  border-radius: 3px;
-  cursor: pointer;
-  position: relative;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) inset;
+  min-width: 2px;
+  background: var(--accent);
+  transition: height 0.08s steps(2);
 }
 
-.prog-fill {
-  height: 100%;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 60%, white 30%), var(--accent));
-  border-radius: 3px;
-  position: relative;
-  transition: width 0.5s linear;
-}
-
-.prog-fill::after {
-  content: '';
-  position: absolute;
-  right: -6px;
-  top: -4px;
-  width: 13px;
-  height: 13px;
-  background: linear-gradient(180deg, #fff, #d8e6f4);
-  border: 1px solid var(--accent);
-  border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-}
-
+/* ── Transport buttons ──────────────────── */
 .transport {
   display: flex;
   align-items: center;
@@ -1517,346 +1011,246 @@ body.light .viz-bar-wrap {
   gap: 8px;
 }
 
-.tbtn {
-  background: linear-gradient(180deg, var(--surface) 0%, var(--surface3) 100%);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  width: 34px;
-  height: 32px;
-  border-radius: var(--radius);
-  cursor: pointer;
+.tbtn,
+.play-btn {
+  min-width: 42px;
+  height: 34px;
+  flex-shrink: 0;
+  padding: 0 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  transition: all 0.12s;
-  box-shadow: 0 1px 0 var(--glass-hi-soft) inset;
-}
-
-.tbtn:hover {
+  border: 1px solid var(--border);
+  background: var(--surface);
   color: var(--text);
-  border-color: var(--accent);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
-.tbtn:active {
-  transform: translateY(1px);
-  box-shadow: none;
+.tbtn:hover,
+.play-btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  text-shadow: none;
 }
 
 .tbtn.on {
   color: var(--accent);
   border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  border-style: double;
+  border-width: 3px;
 }
+
+.tbtn.on:hover { color: var(--on-accent); }
 
 .play-btn {
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--accent) 55%, white 35%), var(--accent) 55%, color-mix(in srgb, var(--accent) 75%, black 15%) 100%);
-  border: 1px solid color-mix(in srgb, var(--accent) 70%, black 15%);
-  color: #fff;
-  font-size: 17px;
-  cursor: pointer;
+  min-width: 64px;
+  height: 40px;
+  border: 3px double var(--accent);
+  color: var(--accent);
+  font-size: 16px;
+  box-shadow: 0 0 14px var(--accent-glow);
+}
+
+.play-btn.small {
+  min-width: 40px;
+  height: 30px;
+  border-width: 3px;
+  font-size: 13px;
+  box-shadow: none;
+}
+
+/* ── Mini player: the status line ───────── */
+.mini-player {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px 6px 6px;
+  background: var(--surface2);
+  border-top: 3px double var(--border);
+}
+
+.mini-progress {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  height: 3px;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+  transition: width 0.5s steps(4);
+}
+
+.mini-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px;
+  border: none;
+  background: transparent;
+  text-align: left;
+}
+
+.mini-info:hover {
+  background: var(--accent);
+  color: var(--on-accent);
+  text-shadow: none;
+}
+
+.mini-info:hover .mini-artist { color: inherit; opacity: 0.8; }
+
+.mini-art {
+  width: 64px;
+  aspect-ratio: 16 / 9;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.12s;
-  box-shadow: 0 0 16px var(--accent-glow), 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.play-btn:hover { filter: brightness(1.12); }
-.play-btn:active { transform: scale(0.94); }
-
-/* ════════════════════════════════════════
-   RESPONSIVE
-════════════════════════════════════════ */
-/* Reacts to the app window's own dragged width (see .wmp-app's
-   `container` property), not just the browser viewport — so shrinking
-   the window with the resize grip collapses the sidebar too. */
-@container wmp-app (max-width: 860px) {
-  .wmp-sidebar {
-    display: none;
-  }
-}
-
-/* Below this, "♫ Playlist Maker" + the Settings/theme controls no longer
-   fit on one tabbar row — drop the brand text (icon stays) so the tabbar
-   never wraps to a second row and eats vertical space in a short window. */
-@container wmp-app (max-width: 520px) {
-  .wmp-brand-text {
-    display: none;
-  }
-}
-
-@media (max-width: 600px) {
-  body { padding: 0; }
-
-  .wmp-tabbar {
-    padding: 0.5rem 0.85rem;
-  }
-
-  .wmp-content {
-    padding: 1.25rem 1rem 3rem;
-  }
-
-  .playlist-item {
-    flex-wrap: wrap;
-  }
-
-  .playlist-item h3 { flex: 1 1 100%; }
-}
-
-/* ════════════════════════════════════════
-   COMPACT PLAYER — looks like a handheld
-   mp3 player: stacked art/title, marquee
-   text, playlist tucked into a side drawer.
-   Keyed off the app WINDOW's own width (container
-   query), so dragging the window small triggers it
-   even in a wide browser — not just a narrow phone.
-════════════════════════════════════════ */
-@container wmp-app (max-width: 480px) {
-  .wmp-content {
-    padding: 1rem 1rem 2rem;
-  }
-
-  .song-page {
-    gap: 0.6rem;
-  }
-
-  .back-btn {
-    padding: 0.3rem 0.8rem;
-    font-size: 0.8rem;
-  }
-
-  .song-page-toolbar h2 {
-    font-size: 1.05rem;
-  }
-
-  .song-page-desc {
-    display: none;
-  }
-
-  .win {
-    position: relative;
-    border-radius: 22px;
-    border-color: color-mix(in srgb, var(--accent) 22%, var(--border));
-    box-shadow:
-      0 20px 44px rgba(0, 0, 0, 0.45),
-      0 0 0 1px rgba(255, 255, 255, 0.04) inset,
-      0 0 32px color-mix(in srgb, var(--accent) 16%, transparent);
-  }
-
-  .now-playing {
-    flex-direction: column;
-    text-align: center;
-    padding: 28px 20px 20px;
-    background:
-      radial-gradient(ellipse 130% 90% at 50% -10%, color-mix(in srgb, var(--accent) 30%, transparent) 0%, transparent 60%),
-      linear-gradient(180deg, color-mix(in srgb, var(--accent) 16%, var(--surface2)) 0%, var(--surface2) 75%);
-  }
-
-  .art {
-    width: 128px;
-    height: 128px;
-    border-radius: 18px;
-    font-size: 36px;
-    margin-bottom: 4px;
-    border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
-    box-shadow:
-      0 10px 26px rgba(0, 0, 0, 0.4),
-      0 0 0 5px color-mix(in srgb, var(--accent) 14%, transparent),
-      0 0 26px color-mix(in srgb, var(--accent) 22%, transparent);
-  }
-
-  .song-meta {
-    width: 100%;
-    margin-top: 6px;
-  }
-
-  .song-title {
-    font-size: 19px;
-    letter-spacing: 0.02em;
-  }
-
-  .song-by {
-    font-size: 13px;
-    margin-top: 4px;
-  }
-
-  .marquee:not(:has(.scrolling)) {
-    text-align: center;
-  }
-
-  .song-sub {
-    margin-top: 8px;
-    text-align: center;
-  }
-
-  .playlist-toggle {
-    display: flex;
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    background: rgba(0, 0, 0, 0.25);
-    border-color: rgba(255, 255, 255, 0.18);
-    backdrop-filter: blur(2px);
-  }
-
-  .playlist-toggle:hover {
-    background: rgba(0, 0, 0, 0.4);
-  }
-
-  .viz-bar-wrap {
-    margin: 0 16px;
-    width: auto;
-    height: 44px;
-    border-radius: var(--radius-lg);
-  }
-
-  .pl-header {
-    display: none;
-  }
-
-  .controls {
-    background: linear-gradient(180deg, var(--surface3) 0%, var(--surface2) 100%);
-    border-top-color: color-mix(in srgb, var(--accent) 14%, var(--border));
-    padding: 16px 18px 20px;
-  }
-
-  .prog-track {
-    height: 8px;
-  }
-
-  .tbtn {
-    width: 40px;
-    height: 38px;
-    font-size: 17px;
-  }
-
-  .play-btn {
-    width: 56px;
-    height: 56px;
-    font-size: 20px;
-  }
-
-  .transport {
-    gap: 10px;
-  }
-
-  .wmp-playlist-backdrop {
-    display: block;
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    z-index: 20;
-  }
-
-  .wmp-playlist-panel {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: min(78vw, 280px);
-    background: var(--surface);
-    border-left: 1px solid var(--border);
-    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.35);
-    transform: translateX(100%);
-    transition: transform 0.2s ease;
-    z-index: 21;
-  }
-
-  .wmp-playlist-panel.open {
-    transform: translateX(0);
-  }
-
-  .playlist-panel-close {
-    display: inline-flex;
-  }
-
-  .wmp-playlist {
-    max-height: none;
-  }
-}
-
-/* Settings modal */
-.settings-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-}
-
-.settings-modal {
-  width: min(90vw, 420px);
-  background: var(--surface);
+  overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
-  padding: 16px 18px;
+  background: var(--surface3);
+  color: var(--accent);
 }
 
-.settings-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
+.mini-art:not(:has(img))::after { content: none; }
+
+.mini-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.settings-modal-header h2 {
-  font-size: 15px;
-  margin: 0;
-}
-
-.settings-modal form {
+.mini-text {
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 1px;
 }
 
-.settings-modal-hint {
-  font-size: 11.5px;
-  color: var(--text-muted);
-  margin: 0 0 4px;
-  line-height: 1.4;
+.mini-title,
+.mini-artist {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.settings-modal-saved {
+.mini-title { font-weight: 700; }
+.mini-title::before { content: '♪ '; color: var(--accent); }
+.mini-info:hover .mini-title::before { color: inherit; }
+.mini-artist { font-size: 12px; color: var(--text-muted); }
+.mini-artist.error { color: var(--danger); }
+
+.mini-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mini-controls .tbtn {
+  min-width: 34px;
+  height: 30px;
+  padding: 0 4px;
   font-size: 12px;
-  color: var(--accent);
-  margin: 0;
 }
 
-/* Playlist share code */
-.share-code-box {
+/* ── Key hint bar (DOS-style, bottom row) ─ */
+.keybar {
+  flex-shrink: 0;
+  display: flex;
+  gap: 18px;
+  padding: 3px 10px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 12px;
+  text-shadow: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.keybar b {
+  padding: 0 4px;
+  margin-right: 4px;
+  background: var(--on-accent);
+  color: var(--accent);
+}
+
+/* ── Empty state ────────────────────────── */
+.empty-state {
+  margin: auto;
+  padding: 24px;
+  text-align: center;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 10px 12px;
-  margin-top: 8px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
 }
 
-.share-code-box label {
-  font-size: 11.5px;
-  color: var(--text-muted);
+.empty-state-icon {
+  font-size: 40px;
+  color: var(--accent);
 }
 
-/* Import playlist form */
-#import-playlist-form {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin: 10px 0;
+/* The hidden YouTube player that actually makes the sound. */
+.yt-host {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ════════════════════════════════════════
+   COMPACT — narrow windows and MP3 player
+   mode (keyed off the window's own width).
+════════════════════════════════════════ */
+@container app (max-width: 520px) {
+  .device {
+    width: calc(100% - 12px);
+    margin-bottom: 6px;
+  }
+
+  .screen {
+    padding: 16px 10px 14px;
+  }
+
+  .screen-header {
+    height: 36px;
+    gap: 6px;
+    padding: 0 4px;
+  }
+
+  .screen-title { font-size: 12px; }
+  .header-btn { font-size: 11px; padding: 0 2px; }
+
+  .keybar { display: none; }
+
+  .playlist-cover {
+    width: 100px;
+    font-size: 22px;
+  }
+
+  h2 { font-size: 15px; }
+
+  .pill {
+    min-height: 26px;
+    padding: 0 4px;
+    font-size: 12px;
+  }
+
+  .menu-row { padding: 5px 8px 5px 4px; gap: 8px; }
+  .menu-title { font-size: 13px; }
+
+  .screen--now-playing { padding: 12px 12px 14px; }
+  .now-playing { gap: 10px; }
+  .np-title { font-size: 16px; }
+  .transport { gap: 6px; }
+  .tbtn { min-width: 38px; height: 32px; padding: 0 4px; }
+  .play-btn { min-width: 56px; height: 38px; }
 }
 
 /* ════════════════════════════════════════
@@ -1865,7 +1259,7 @@ body.light .viz-bar-wrap {
 .vkbd-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -1875,55 +1269,51 @@ body.light .viz-bar-wrap {
 .vkbd {
   width: 100%;
   max-width: 560px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--device);
+  border: 3px double var(--border);
   border-bottom: none;
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 30px color-mix(in srgb, var(--accent) 20%, transparent);
   padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
 }
 
 .vkbd-preview {
   min-height: 20px;
-  padding: 8px 10px;
+  padding: 7px 10px;
   margin-bottom: 12px;
-  background: var(--surface2);
+  background: var(--field);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
   font-size: 0.95rem;
   color: var(--text);
   word-break: break-all;
 }
 
+.vkbd-preview::before { content: '> '; color: var(--accent); }
+
 .vkbd-placeholder { color: var(--text-muted); }
 
 .vkbd-page-label {
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   color: var(--accent);
   margin-bottom: 6px;
 }
 
 .vkbd-caret {
   color: var(--accent);
-  animation: vkbd-blink 1s step-end infinite;
-}
-
-@keyframes vkbd-blink {
-  50% { opacity: 0; }
+  animation: blink 1s step-end infinite;
 }
 
 .vkbd-rows {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .vkbd-row {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   justify-content: center;
 }
 
@@ -1931,23 +1321,28 @@ body.light .viz-bar-wrap {
   flex: 1;
   min-width: 0;
   max-width: 46px;
-  padding: 10px 0;
-  background: linear-gradient(180deg, var(--surface2) 0%, var(--surface3) 100%);
+  padding: 8px 0;
+  background: var(--surface);
   color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border: 1px solid var(--border-subtle);
   font-family: inherit;
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: none;
   cursor: pointer;
-  transition: all var(--transition);
 }
 
-.vkbd-key:hover { border-color: var(--accent); color: var(--accent); }
+.vkbd-key:hover,
+.vkbd-key:focus-visible {
+  outline: none;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  text-shadow: none;
+}
 
 .vkbd-controls {
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 .vkbd-key--wide,
@@ -1966,183 +1361,4 @@ body.light .viz-bar-wrap {
   color: var(--text-muted);
 }
 
-.vkbd-hints b { color: var(--text); }
-
-/* ════════════════════════════════════════
-   LAYOUT FIXES — keep rows from overflowing
-   or covering each other in narrow windows
-════════════════════════════════════════ */
-/* Playlist rows: give the title a real minimum width so the buttons wrap
-   onto their own line instead of squeezing the title to nothing and
-   drawing over it. */
-.playlist-item-titles {
-  flex: 1 1 10rem;
-}
-
-.playlist-item h3,
-.playlist-item h4,
-.song-item h3,
-.song-item h4 {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-/* Song rows: wrap instead of forcing the whole playlist card (and the
-   add-song form inside it) wider than the window. */
-.song-item {
-  flex-wrap: wrap;
-}
-
-.song-item h3 { flex: 1 1 8rem; }
-.song-item h4 { flex: 1 1 5rem; }
-
-.song-page-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.6rem 1rem;
-}
-
-.song-page-toolbar .song-page-meta {
-  flex: 1 1 8rem;
-  min-width: 0;
-}
-
-.song-page-toolbar h2,
-.song-page-toolbar .song-page-desc {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.song-page-toolbar .back-btn {
-  align-self: center;
-  flex-shrink: 0;
-}
-
-/* Desktop player fills the pane with the track list taking whatever height
-   is left (and scrolling), so the play/skip controls are never pushed
-   under the status bar at the default window size. */
-@container wmp-app (min-width: 481px) {
-  .song-page {
-    min-height: 100%;
-  }
-
-  .wmp-content:has(.song-page) {
-    padding-bottom: 1.25rem;
-  }
-
-  .song-page .win {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .song-page .now-playing,
-  .song-page .viz-bar-wrap,
-  .song-page .controls {
-    flex-shrink: 0;
-  }
-
-  .song-page .wmp-playlist-panel {
-    flex: 1 1 0;
-    min-height: 96px;
-  }
-
-  .song-page .wmp-playlist {
-    max-height: none;
-  }
-}
-
-/* Tracks drawer in the compact player is only ~280px wide — too narrow
-   for the desktop 5-column table (the title column got ~25px). Stack the
-   artist under the title instead. */
-@container wmp-app (max-width: 480px) {
-  .pl-item {
-    grid-template-columns: 24px minmax(0, 1fr) auto;
-    grid-template-areas:
-      'num title dur'
-      'num artist dur';
-    column-gap: 8px;
-    row-gap: 1px;
-  }
-
-  .pl-num { grid-area: num; }
-  .pl-title { grid-area: title; }
-  .pl-artist { grid-area: artist; }
-  .pl-dur { grid-area: dur; }
-  .pl-item > div:last-child:empty { display: none; }
-}
-
-/* ════════════════════════════════════════
-   MP3 PLAYER MODE — the window shrinks to
-   just the player (see window:setMp3Mode in
-   electron/main.js). The compact player
-   styles above kick in from the narrow width;
-   this strips the rest of the app chrome and
-   lets the player fill the window.
-════════════════════════════════════════ */
-.mp3-mode .wmp-tabbar,
-.mp3-mode .wmp-sidebar,
-.mp3-mode .wmp-statusbar,
-.mp3-mode .song-page-toolbar {
-  display: none;
-}
-
-.mp3-mode .wmp-content {
-  display: flex;
-  padding: 10px;
-  overflow: hidden;
-}
-
-/* min-width: 0 on each level matters: flex items default to refusing to
-   shrink below their content's width, and a scrolling marquee title's
-   content is the full-length title — so a long song name would stretch
-   the whole player far wider than the window. */
-.mp3-mode .song-page {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  gap: 0;
-}
-
-.mp3-mode .win {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.mp3-mode .song-meta {
-  flex: 0 0 auto;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.mp3-mode .now-playing {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  justify-content: center;
-}
-
-.mp3-mode .viz-bar-wrap,
-.mp3-mode .controls {
-  flex-shrink: 0;
-}
-
-/* Shrink the album art if the window is dragged shorter, rather than
-   pushing the controls off the bottom. */
-.mp3-mode .art {
-  width: clamp(64px, 100vh - 470px, 150px);
-  height: clamp(64px, 100vh - 470px, 150px);
-  flex-shrink: 0;
-}
-
-/* The "Next: …" line is one ellipsized row, but a playback error needs to
-   be read in full — let it wrap instead of trailing off the edge. */
-.song-sub .error {
-  white-space: normal;
-}
+.vkbd-hints b { color: var(--accent); }

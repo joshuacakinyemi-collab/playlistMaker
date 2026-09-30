@@ -6,9 +6,11 @@ A desktop playlist app built with Electron + React. Everything runs locally on y
 
 - Create, edit, and delete playlists and songs, all stored locally on your device
 - Search YouTube for a song and attach it, using your own free YouTube API key (Settings)
-- Play a playlist with a built-in music player
-- Turn a playlist into a share code (Share button) and import someone else's code (My Playlists → Import)
-- Full game controller support — navigate and play music without touching a mouse or keyboard
+- A pocket-media-player style interface: menu screens you move through, a Now Playing screen, and a mini player along the bottom so music keeps playing while you browse
+- Opening a playlist starts playing it; shuffle, loop, and skip work from any screen
+- MP3 Player Mode shrinks the window to a pocket player (header icon, or Settings)
+- Turn a playlist into a share code (Share button) and import someone else's code (Playlists → Import a Shared Playlist)
+- Full game controller and keyboard support — navigate and play music without touching a mouse
 
 ## ⚠️ You need your own YouTube API key
 
@@ -18,7 +20,15 @@ To get one (free):
 1. Go to the [Google Cloud Console](https://console.cloud.google.com/) and create a project (or pick an existing one).
 2. Open **APIs & Services → Library**, search for **YouTube Data API v3**, and click **Enable**.
 3. Go to **APIs & Services → Credentials → Create Credentials → API key**, then copy the key.
-4. Open the app, click the **⚙ Settings** button in the top bar, paste the key in, and click **Save**.
+4. Open the app, click the **⚙** (Settings) button at the top right, paste the key in, and click **Save**.
+
+## Keyboard
+
+| Key | Action |
+| --- | --- |
+| Arrow keys | Move the selection bar |
+| Enter / Space | Open or activate the selected item |
+| Esc | Go back one screen |
 
 ## Controller support
 
@@ -28,7 +38,7 @@ Plug in an Xbox, PlayStation, or other standard-mapping USB/Bluetooth controller
 | --- | --- |
 | D-pad / left stick | Move focus around the screen |
 | A / Cross | Activate the focused button, or open the on-screen keyboard on a focused text field |
-| B / Circle | Go back (closes Settings, or leaves the player for the library) |
+| B / Circle | Go back one screen (or leave MP3 Player Mode from the top screen) |
 | Start | Open/close Settings |
 | X / Square | Play / pause |
 | LB, RB | Previous / next track |
@@ -82,21 +92,26 @@ playlistMaker/
 │   ├── store.js               # electron-store-backed local playlist/song/settings data
 │   ├── youtube.js             # YouTube Data API search, using the user's own API key
 │   ├── share.js                # Encodes/decodes a playlist into a shareable code
-│   └── staticServer.js         # Serves the built app over http://127.0.0.1 (loopback only) —
+│   └── staticServer.js         # Serves the built app over http://localhost (loopback only) —
 │                                #   required for YouTube playback to work, see its comments
 └── frontend/                 # React app (Vite), the renderer process
     └── src/
-        ├── App.jsx             # Root component + the app's window chrome (titlebar, sidebar)
-        ├── gamepad.js           # Controller support: spatial focus navigation + button actions
-        ├── adapters/
-        │   ├── playlist-adapters.js  # window.api.playlists.* wrappers
-        │   ├── song-adapters.js      # window.api.songs.* wrappers
-        │   └── settings-adapters.js  # window.api.settings.* wrappers
+        ├── App.jsx             # Window chrome + screen-stack navigation (push/back, like an mp3 player's menus)
+        ├── App.css             # All styling (media-player look, compact/MP3 mode, on-screen keyboard)
+        ├── ThemeContext.jsx     # Dark/light + accent color, saved in the app's settings file
+        ├── gamepad.js           # Controller + keyboard navigation: spatial focus movement + button actions
+        ├── adapters/            # window.api.* wrappers that resolve to { data, error } (shared helper in call.js)
+        ├── player/
+        │   ├── PlayerContext.jsx  # App-wide music engine: hidden YouTube player, queue, shuffle, loop
+        │   ├── NowPlaying.jsx     # Full Now Playing screen
+        │   ├── MiniPlayer.jsx     # Now-playing strip along the bottom of other screens
+        │   ├── Marquee.jsx        # Scrolling title text for names that don't fit
+        │   └── Visualizer.jsx     # Animated bars
+        ├── screens/             # Library, Playlist, Add Song, New/Edit Playlist, Import, Settings
         └── components/
-            ├── SettingsModal.jsx    # YouTube API key entry
-            ├── GamepadKeyboard.jsx  # Controller-navigable on-screen keyboard
-            ├── playlist/            # Playlist library, item, add/import forms
-            └── song/                # Song list/item, add-song (YouTube search), player page
+            ├── Menu.jsx             # Menu list + row building blocks used by every screen
+            ├── PocketPlayerIcon.jsx # MP3 Player Mode icon
+            └── GamepadKeyboard.jsx  # Controller-navigable on-screen keyboard
 ```
 
 ## How playlist data (and your API key) is stored

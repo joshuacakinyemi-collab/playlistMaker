@@ -47,6 +47,17 @@ const actions = {
   onActivateInput: null,
 };
 
+// Whether the last thing the user touched was the mouse/touchscreen (as
+// opposed to the keyboard or a controller). Screens only move focus for
+// the user when they're navigating without a pointer, so a mouse click
+// doesn't leave a stray selection highlight on some other row.
+let usingPointer = true;
+
+window.addEventListener('pointerdown', () => { usingPointer = true; }, true);
+window.addEventListener('keydown', () => { usingPointer = false; }, true);
+
+export const isUsingPointer = () => usingPointer;
+
 export function registerGamepadActions(partial) {
   const previous = {};
   for (const key of Object.keys(partial)) {
@@ -76,10 +87,9 @@ function isTextEntry(el) {
 }
 
 function getFocusableElements() {
-  // Scope to the innermost open overlay, so the D-pad can't "escape" it
-  // onto whatever's behind it — the on-screen keyboard takes priority
-  // since it can itself be opened on top of the Settings modal.
-  const scope = document.querySelector('.vkbd') || document.querySelector('.settings-modal') || document;
+  // While the on-screen keyboard is open, keep the D-pad inside it so it
+  // can't "escape" onto the screen behind.
+  const scope = document.querySelector('.vkbd') || document;
   return Array.from(scope.querySelectorAll('button, input, a[href], [tabindex]')).filter(isFocusable);
 }
 
@@ -91,7 +101,14 @@ function rectCenter(el) {
 function findNextFocusable(current, direction) {
   const candidates = getFocusableElements();
   if (!current || current === document.body || !candidates.includes(current)) {
-    return candidates[0] || null;
+    // Nothing selected yet: start on the current screen's first menu row
+    // (not the window buttons up in the title bar).
+    return (
+      candidates.find((el) => el.matches('.screen .menu-row')) ||
+      candidates.find((el) => el.closest('.screen')) ||
+      candidates[0] ||
+      null
+    );
   }
   const cur = rectCenter(current);
   let best = null;
@@ -170,7 +187,10 @@ const dpadState = {};
 function pollButtons(pad) {
   const prev = previousButtons[pad.index] || [];
   pad.buttons.forEach((button, i) => {
-    if (button.pressed && !prev[i]) handleButtonDown(i);
+    if (button.pressed && !prev[i]) {
+      usingPointer = false;
+      handleButtonDown(i);
+    }
   });
   previousButtons[pad.index] = pad.buttons.map((b) => b.pressed);
 }
@@ -183,6 +203,7 @@ function pollDirectional(pad, timestamp) {
     return;
   }
   if (!state || state.direction !== direction) {
+    usingPointer = false;
     dpadState[pad.index] = { direction, since: timestamp, lastRepeat: timestamp };
     moveFocus(direction);
     return;
@@ -212,6 +233,13 @@ function anyPadConnected() {
   return Array.from(pads).some(Boolean);
 }
 
+const KEY_DIRECTIONS = {
+  ArrowUp: 'up',
+  ArrowDown: 'down',
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+};
+
 let started = false;
 
 // Only polls while a controller is actually connected, so the app doesn't
@@ -230,6 +258,23 @@ export function startGamepadNavigation() {
       rafId = null;
     }
   };
+
+  // The keyboard gets the same menu navigation as the D-pad: arrow keys
+  // move the selection bar, Enter/Space activate (native), Esc goes back.
+  // Arrow keys are left alone inside text fields so the caret still moves.
+  window.addEventListener('keydown', (e) => {
+    if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
+    const inText = isTextEntry(document.activeElement);
+    const direction = KEY_DIRECTIONS[e.key];
+    if (direction && !inText) {
+      e.preventDefault();
+      moveFocus(direction);
+    } else if (e.key === 'Escape' && !document.querySelector('.vkbd')) {
+      e.preventDefault();
+      if (inText) document.activeElement.blur();
+      else actions.onBack?.();
+    }
+  });
 
   window.addEventListener('gamepadconnected', start);
   window.addEventListener('gamepaddisconnected', () => {
